@@ -108,6 +108,45 @@ export async function generatePlanIdeas(
 }
 
 /**
+ * Transforma uma instrução curta ("avisa que amanhã é feriado e não tem
+ * postagem") numa mensagem de WhatsApp pronta pra mandar. Sem IA configurada,
+ * devolve a própria instrução — o disparo funciona igual, só sem o texto
+ * lapidado.
+ */
+export async function draftBroadcastMessage(instrucao: string): Promise<string> {
+  const s = useSettings.getState();
+  const texto = instrucao.trim();
+  if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) return texto;
+  try {
+    const res = await fetch(s.aiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.aiKey}` },
+      body: JSON.stringify({
+        model: s.aiModel,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Você escreve mensagens curtas de WhatsApp para clientes de uma agência de marketing. ' +
+              'Português do Brasil, tom educado e direto, sem emojis em excesso, sem assinatura. ' +
+              'Devolva só o texto da mensagem, pronto pra copiar e colar.',
+          },
+          { role: 'user', content: `Escreva a mensagem a partir desta instrução: "${texto}"` },
+        ],
+        temperature: 0.6,
+        max_tokens: 300,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const out: string | undefined = data?.choices?.[0]?.message?.content;
+    return out?.trim() || texto;
+  } catch {
+    return texto;
+  }
+}
+
+/**
  * Gera a copy do post. Usa a IA configurada (endpoint compatível com OpenAI)
  * quando disponível; caso contrário, usa o gerador local grátis.
  */

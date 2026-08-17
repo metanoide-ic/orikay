@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Logo, LogoMark } from './Logo';
 import { Avatar } from './ui';
+import { AIHelper } from './AIHelper';
 import { useAuth } from '@/lib/authStore';
 import { useSettings } from '@/lib/settingsStore';
 import { usePendingPosts, fireDueNotifications } from '@/lib/notifications';
@@ -183,6 +184,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </motion.div>
       </main>
+
+      <AIHelper />
     </div>
   );
 }

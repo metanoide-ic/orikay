@@ -37,6 +37,7 @@ export default function Finance() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<'todos' | TxType>('todos');
   const [billingMsg, setBillingMsg] = useState('');
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
 
   // Gera as cobranças e as contas fixas do mês automaticamente (idempotente).
   useEffect(() => {
@@ -108,6 +109,28 @@ export default function Finance() {
   );
   const expensesPaid = monthExpenses.filter((t) => t.status === 'pago').length;
 
+  function alternarSelecao(id: string) {
+    setSelecionadas((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  /**
+   * Baixa em massa: pra quando o cliente já mandou o comprovante — dá uma
+   * conferida no grupo do WhatsApp, marca aqui quem já pagou e clica uma
+   * vez só. Não tenta adivinhar sozinho quem pagou lendo mensagem — isso
+   * seria arriscado (falso positivo custa dinheiro de verdade).
+   */
+  function marcarSelecionadasPagas() {
+    const alvo = [...selecionadas];
+    alvo.forEach((id) => markChargePaid(id));
+    setBillingMsg(`${alvo.length} cobrança(s) marcada(s) como paga(s).`);
+    setSelecionadas(new Set());
+    setTimeout(() => setBillingMsg(''), 4000);
+  }
+
   function save() {
     const amount = parseFloat(form.amount.replace(',', '.'));
     if (!form.description.trim() || !amount || amount <= 0) return;
@@ -167,6 +190,15 @@ export default function Finance() {
           </div>
         </div>
         {billingMsg && <p className="border-b border-line bg-white/[0.02] px-5 py-2.5 text-sm text-white/70">{billingMsg}</p>}
+        {selecionadas.size > 0 && (
+          <div className="flex items-center justify-between gap-3 border-b border-line bg-brand-500/10 px-5 py-2.5">
+            <span className="text-sm text-brand-100">{selecionadas.size} selecionada(s) — já mandaram o comprovante?</span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setSelecionadas(new Set())}>Limpar</Button>
+              <Button size="sm" onClick={marcarSelecionadasPagas}>Marcar como pagas</Button>
+            </div>
+          </div>
+        )}
         {monthCharges.length > 0 && (
           <div className="border-b border-line px-5 py-3">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
@@ -186,8 +218,18 @@ export default function Finance() {
                 const client = clientMap[ch.clientId];
                 const overdue = isOverdue(ch);
                 return (
-                  <tr key={ch.id} className="group">
-                    <td className="px-5 py-3">
+                  <tr key={ch.id} className={cn('group', selecionadas.has(ch.id) && 'bg-brand-500/5')}>
+                    <td className="w-10 px-5 py-3">
+                      {ch.status !== 'paga' && (
+                        <input
+                          type="checkbox"
+                          checked={selecionadas.has(ch.id)}
+                          onChange={() => alternarSelecao(ch.id)}
+                          className="accent-brand-500"
+                        />
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-2.5">
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: client?.color ?? '#666' }} />
                         <span className="font-medium text-white">{client?.name ?? 'Cliente removido'}</span>
