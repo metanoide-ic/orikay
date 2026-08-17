@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, KanbanSquare, Wallet, Users, Settings, LogOut,
-  Menu, X, Clapperboard, Library, Zap, Plug, Bell, AlertTriangle, Building2, Columns3, Megaphone,
+  Menu, X, Clapperboard, Library, Zap, Plug, Bell, AlertTriangle, Building2, Columns3, Megaphone, ListChecks,
 } from 'lucide-react';
 import { Logo, LogoMark } from './Logo';
 import { Avatar } from './ui';
@@ -20,19 +20,25 @@ interface NavDef { to: string; label: string; icon: typeof LayoutDashboard; end?
 
 function useNav(): NavDef[] {
   const canFinance = useAuth((s) => s.current()?.canFinance);
+  // Ordem pedida: Quadros primeiro, o resto da rotina de conteúdo logo
+  // depois, e Financeiro/Automações/Clientes/Equipe/Integrações no final,
+  // fechando com o Checklist do dia.
   const items: NavDef[] = [
-    { to: '/app/posts', label: 'Posts', icon: KanbanSquare },
     { to: '/app/quadros', label: 'Quadros', icon: Columns3 },
+    { to: '/app/posts', label: 'Posts', icon: KanbanSquare },
     { to: '/app/videos', label: 'Vídeos', icon: Clapperboard },
     { to: '/app/painel', label: 'Painel', icon: LayoutDashboard },
     { to: '/app/trafego', label: 'Tráfego', icon: Megaphone },
     { to: '/app/biblioteca', label: 'Biblioteca', icon: Library },
+  ];
+  if (canFinance) items.push({ to: '/app/financeiro', label: 'Financeiro', icon: Wallet });
+  items.push(
     { to: '/app/automacoes', label: 'Automações', icon: Zap },
     { to: '/app/clientes', label: 'Clientes', icon: Building2 },
     { to: '/app/equipe', label: 'Equipe', icon: Users },
-  ];
-  if (canFinance) items.push({ to: '/app/financeiro', label: 'Financeiro', icon: Wallet });
-  items.push({ to: '/app/integracoes', label: 'Integrações', icon: Plug });
+    { to: '/app/integracoes', label: 'Integrações', icon: Plug },
+    { to: '/app/checklist', label: 'Checklist do dia', icon: ListChecks },
+  );
   return items;
 }
 

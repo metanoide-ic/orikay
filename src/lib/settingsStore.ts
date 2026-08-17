@@ -33,6 +33,12 @@ export interface Settings {
   autoBilling: boolean;
   /** Última data (AAAA-MM-DD) em que a cobrança automática do dia já rodou. */
   lastAutoBillingRun: string;
+
+  // --- Ordem das colunas (o usuário pode arrastar pra reorganizar) ---
+  /** Ordem das colunas de Posts. Vazio = usa a ordem padrão (STAGE_ORDER). */
+  postStageOrder: string[];
+  /** Ordem das colunas de Vídeos. Vazio = usa a ordem padrão (VIDEO_STAGE_ORDER). */
+  videoStageOrder: string[];
 }
 
 interface SettingsState extends Settings {
@@ -57,6 +63,8 @@ const defaults: Settings = {
   contadorWhatsapp: '',
   autoBilling: true,
   lastAutoBillingRun: '',
+  postStageOrder: [],
+  videoStageOrder: [],
 };
 
 export const useSettings = create<SettingsState>()(

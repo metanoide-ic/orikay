@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -10,11 +10,11 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, useSortable, verticalListSortingStrategy, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
   Plus, CheckSquare, MessageSquare, AlertTriangle, LayoutGrid, CalendarDays, X, VideoOff, Trash2,
-  FolderOpen, Copy, Clapperboard, ArrowRightCircle,
+  FolderOpen, Copy, Clapperboard, ArrowRightCircle, GripVertical,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientFilter } from '@/components/ClientFilter';
@@ -23,8 +23,9 @@ import { PostsCalendar } from '@/components/PostsCalendar';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
+import { useSettings } from '@/lib/settingsStore';
 import { useClientMap } from '@/lib/hooks';
-import { STAGE_META, STAGE_ORDER, STAGE_FUNNEL, PLATFORM_COLOR } from '@/lib/labels';
+import { STAGE_META, STAGE_ORDER, STAGE_FUNNEL, PLATFORM_COLOR, resolveOrder } from '@/lib/labels';
 import { onPostStageChange } from '@/lib/automations';
 import { cn, todayISO } from '@/lib/utils';
 import type { Post, PostStage } from '@/lib/types';
@@ -33,10 +34,16 @@ import { PostModal } from '@/components/PostModal';
 export default function Posts() {
   const { posts, clients, movePost, removePost, updatePost, addPost } = useData();
   const clientMap = useClientMap();
+  const savedStageOrder = useSettings((s) => s.postStageOrder);
+  const setStageOrder = useSettings((s) => s.update);
   const [openId, setOpenId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<'pipeline' | 'calendario'>('pipeline');
   const [clientFilter, setClientFilter] = useState<string>('');
+
+  // As colunas podem ser arrastadas de lugar (o usuário decide a ordem que
+  // faz mais sentido pra rotina dele) — fica salvo por navegador.
+  const stageOrder = useMemo(() => resolveOrder(savedStageOrder, STAGE_ORDER), [savedStageOrder]);
 
   // Seleção múltipla ao estilo Windows: Ctrl/Cmd+clique soma um, Shift+clique
   // seleciona o intervalo dentro da mesma lista. Clique simples limpa a seleção.
@@ -70,6 +77,7 @@ export default function Posts() {
   }, [visible]);
 
   const activePost = activeId ? posts.find((p) => p.id === activeId) : null;
+  const activeStage = activeId?.startsWith('col-') ? (activeId.slice(4) as PostStage) : null;
 
   function handleCardClick(post: Post, e: React.MouseEvent) {
     if (e.shiftKey && lastClicked) {
@@ -115,8 +123,15 @@ export default function Posts() {
     setSelected(new Set());
   }
 
-  /** Clica e arrasta numa área vazia do quadro pra selecionar vários cards de uma vez. */
-  function onBoardMouseDown(e: React.MouseEvent) {
+  /**
+   * Clica e arrasta numa área vazia da página pra selecionar vários cards de
+   * uma vez — igual selecionar ícones na área de trabalho do Windows. Fica no
+   * elemento mais de fora (a página toda), não só na faixa das colunas, pra
+   * funcionar mesmo começando na margem, do lado esquerdo da primeira coluna
+   * ou em qualquer espaço vazio.
+   */
+  function onBoardMouseDown(e: MouseEvent) {
+    if (view !== 'pipeline') return; // só faz sentido no quadro, não no calendário
     if (e.button !== 0) return; // só botão esquerdo
     const target = e.target as HTMLElement;
     if (target.closest('[data-post-id], button, textarea, input, select, a')) return;
@@ -125,11 +140,31 @@ export default function Posts() {
     let x2 = x1, y2 = y1;
     setMarquee({ x1, y1, x2, y2 });
 
+    // Auto-scroll: se o mouse fica perto da borda da tela enquanto arrasta,
+    // rola a página sozinha, pra dar pra alcançar os cards mais abaixo sem
+    // ficar "preso" no que já está visível.
+    const BORDA = 56;
+    let velocidade = 0;
+    let raf = 0;
+    function passoScroll() {
+      if (velocidade !== 0) {
+        window.scrollBy(0, velocidade);
+        y2 += velocidade; // acompanha o scroll pra manter o retângulo correto
+        setMarquee({ x1, y1, x2, y2 });
+      }
+      raf = requestAnimationFrame(passoScroll);
+    }
+    raf = requestAnimationFrame(passoScroll);
+
     function onMove(ev: MouseEvent) {
       x2 = ev.clientX; y2 = ev.clientY;
       setMarquee({ x1, y1, x2, y2 });
+      if (ev.clientY < BORDA) velocidade = -Math.round((BORDA - ev.clientY) / 2) - 4;
+      else if (ev.clientY > window.innerHeight - BORDA) velocidade = Math.round((ev.clientY - (window.innerHeight - BORDA)) / 2) + 4;
+      else velocidade = 0;
     }
     function onUp() {
+      cancelAnimationFrame(raf);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       const rect = { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) };
@@ -150,8 +185,17 @@ export default function Posts() {
     window.addEventListener('mouseup', onUp);
   }
 
+  // Escuta o clique-e-arrasta na página inteira (não só na faixa das
+  // colunas) — assim começar o arrasto na margem, do lado esquerdo da
+  // primeira coluna ou em qualquer espaço vazio da tela funciona igual.
+  useEffect(() => {
+    document.addEventListener('mousedown', onBoardMouseDown);
+    return () => document.removeEventListener('mousedown', onBoardMouseDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
   function contextItemsFor(post: Post): ContextMenuItem[] {
-    const outrasEtapas = STAGE_ORDER.filter((s) => s !== post.stage);
+    const outrasEtapas = stageOrder.filter((s) => s !== post.stage);
     return [
       { label: 'Abrir', icon: <FolderOpen size={15} />, onSelect: () => setOpenId(post.id) },
       {
@@ -189,6 +233,21 @@ export default function Posts() {
     setActiveId(null);
     const { active, over } = e;
     if (!over) return;
+
+    // Arrastou a própria coluna (o cabeçalho) — reordena as colunas, não os cards.
+    // O alvo pode chegar com ou sem o prefixo "col-" (a área de cartões da
+    // coluna de destino usa o id puro do estágio) — aceita os dois formatos.
+    if (String(active.id).startsWith('col-')) {
+      const overRaw = String(over.id);
+      const fromStage = String(active.id).slice(4) as PostStage;
+      const toStage = (overRaw.startsWith('col-') ? overRaw.slice(4) : overRaw) as PostStage;
+      const from = stageOrder.indexOf(fromStage);
+      const to = stageOrder.indexOf(toStage);
+      if (from === -1 || to === -1 || from === to) return;
+      setStageOrder({ postStageOrder: arrayMove(stageOrder, from, to) });
+      return;
+    }
+
     const post = posts.find((p) => p.id === String(active.id));
     const toStage = stageOf(String(over.id));
     if (!post || !toStage) return;
@@ -201,7 +260,7 @@ export default function Posts() {
   }
 
   return (
-    <div>
+    <div className="min-h-[calc(100vh-6rem)]">
       <PageHeader
         title="Posts"
         subtitle="Arraste os cartões entre as listas. Ao chegar em Aprovação, a copy vai para o grupo."
@@ -226,14 +285,20 @@ export default function Posts() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners}
           onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-4" onMouseDown={onBoardMouseDown}>
-            {STAGE_ORDER.map((stage) => (
-              <StageList key={stage} stage={stage} posts={byStage[stage] || []} clientMap={clientMap}
-                selected={selected} onCardClick={handleCardClick}
-                onCardContextMenu={(post, e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, post }); }} />
-            ))}
-          </div>
-          <DragOverlay>{activePost ? <PostCard post={activePost} clientMap={clientMap} dragging /> : null}</DragOverlay>
+          <SortableContext items={stageOrder.map((s) => `col-${s}`)} strategy={horizontalListSortingStrategy}>
+            <div className="flex gap-3 overflow-x-auto pb-4">
+              {stageOrder.map((stage) => (
+                <StageList key={stage} stage={stage} posts={byStage[stage] || []} clientMap={clientMap}
+                  selected={selected} onCardClick={handleCardClick}
+                  onCardContextMenu={(post, e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, post }); }} />
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {activePost ? <PostCard post={activePost} clientMap={clientMap} dragging />
+              : activeStage ? <div className="flex w-[300px] shrink-0 items-center gap-2 rounded-xl border border-brand-400/60 bg-ink-850 px-3 py-2.5 shadow-2xl"><span className="h-2.5 w-2.5 rounded-full" style={{ background: STAGE_META[activeStage].color }} /><span className="text-sm font-semibold text-white/90">{STAGE_META[activeStage].label}</span></div>
+              : null}
+          </DragOverlay>
         </DndContext>
       )}
 
@@ -282,6 +347,9 @@ function StageList({
   onCardContextMenu: (post: Post, e: React.MouseEvent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
+  const {
+    setNodeRef: setColRef, attributes, listeners, transform, transition, isDragging,
+  } = useSortable({ id: `col-${stage}` });
   const addPost = useData((s) => s.addPost);
   const meta = STAGE_META[stage];
   const [adding, setAdding] = useState(false);
@@ -294,8 +362,18 @@ function StageList({
   }
 
   return (
-    <div className="flex w-[300px] shrink-0 flex-col rounded-xl border border-line bg-ink-900/60">
-      <div className="flex items-center gap-2 px-3 py-2.5">
+    <div
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className="flex w-[300px] shrink-0 flex-col rounded-xl border border-line bg-ink-900/60"
+    >
+      {/*
+        O "pegador" da coluna é só o cabeçalho — de propósito não é o cartão
+        inteiro, porque senão a área de arrastar coluna ficaria por cima da
+        área de soltar cartão (mesmo espaço, dois alvos), e o dnd-kit não
+        saberia pra qual dos dois resolver o drop.
+      */}
+      <div ref={setColRef} {...attributes} {...listeners} className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing">
+        <GripVertical size={14} className="text-white/20" />
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: meta.color }} />
         <span className="text-sm font-semibold text-white/90">{meta.label}</span>
         <span className="rounded-full bg-white/10 px-2 text-xs text-white/50">{posts.length}</span>

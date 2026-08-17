@@ -127,6 +127,43 @@ async function enviarWhatsapp(numero, mensagem) {
   if (!res.ok) throw new Error(`Evolution respondeu ${res.status}: ${(await res.text()).slice(0, 160)}`);
 }
 
+/**
+ * Lista os grupos de WhatsApp que a instância conectada enxerga — é o que
+ * deixa a plataforma "adivinhar" sozinha qual grupo é de qual cliente, sem
+ * precisar copiar e colar ID de grupo um por um.
+ */
+async function listarGrupos() {
+  if (!whatsappConfigurado()) throw new Error('WhatsApp não configurado no conector');
+
+  if (config.provedor === 'zapi') {
+    const headers = {};
+    if (config.zapiClientToken) headers['Client-Token'] = config.zapiClientToken;
+    const grupos = [];
+    // Percorre as páginas até a Z-API devolver menos que o pedido (acabou a lista).
+    for (let pagina = 1; pagina <= 10; pagina++) {
+      const url = `${API_ZAPI}/instances/${config.zapiInstancia}/token/${config.zapiToken}/chats?page=${pagina}&pageSize=100`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`Z-API respondeu ${res.status} ao listar conversas`);
+      const lista = await res.json();
+      if (!Array.isArray(lista) || lista.length === 0) break;
+      for (const c of lista) {
+        if (c.isGroup) grupos.push({ id: c.phone, nome: c.name || c.phone });
+      }
+      if (lista.length < 100) break;
+    }
+    return grupos;
+  }
+
+  const base = config.evolutionUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/group/fetchAllGroups/${config.evolutionInstancia}?getParticipants=false`, {
+    headers: { apikey: config.evolutionApiKey },
+  });
+  if (!res.ok) throw new Error(`Evolution respondeu ${res.status} ao listar grupos`);
+  const lista = await res.json();
+  if (!Array.isArray(lista)) return [];
+  return lista.map((g) => ({ id: g.id, nome: g.subject || g.id }));
+}
+
 /* ------------------------------ Instagram ----------------------------- */
 
 async function publicarInstagram(destino, legenda, mediaUrl) {
@@ -1017,6 +1054,18 @@ const servidor = createServer(async (req, res) => {
     if (tunel.url) void registrarWebhooks();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true }));
+  }
+
+  // A plataforma pede aqui a lista de grupos pra casar sozinha com os clientes.
+  if (url.pathname === '/grupos') {
+    try {
+      const grupos = await listarGrupos();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, grupos }));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, erro: e.message }));
+    }
   }
 
   if (url.pathname === '/estado') {

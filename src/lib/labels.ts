@@ -72,6 +72,19 @@ export const AUTOMATION_META: Record<ColumnAutomation, { label: string; short: s
   },
 };
 
+/**
+ * Aplica a ordem de colunas que o usuário arrastou, sem perder nem
+ * duplicar nada: começa pelas que ele reordenou (só as que ainda existem)
+ * e completa no fim com qualquer coluna nova que o código tenha adicionado
+ * depois dele ter mexido na ordem.
+ */
+export function resolveOrder<T extends string>(saved: string[], padrao: T[]): T[] {
+  const validas = saved.filter((s): s is T => (padrao as string[]).includes(s));
+  const faltando = padrao.filter((s) => !validas.includes(s));
+  const resultado = [...validas, ...faltando];
+  return resultado.length === padrao.length ? resultado : padrao;
+}
+
 export const BOARD_AREA_META: Record<BoardArea, { label: string }> = {
   designer: { label: 'Designer' },
   filmmaker: { label: 'Filmmaker' },

@@ -1,18 +1,23 @@
 import { useMemo } from 'react';
-import { CheckCircle2, Circle, Clapperboard } from 'lucide-react';
+import { CheckCircle2, Circle, Clapperboard, ListChecks } from 'lucide-react';
 import { useData } from '@/lib/dataStore';
 import { useClientMap } from '@/lib/hooks';
 import { markPublishedManual } from '@/lib/automations';
 import { STAGE_META, STAGE_FUNNEL, PLATFORM_COLOR } from '@/lib/labels';
 import { cn, todayISO } from '@/lib/utils';
+import { EmptyState } from '@/components/ui';
 
 /**
  * Checklist do dia: tudo que precisa sair hoje (ou já devia ter saído),
  * mais o que já foi publicado hoje. Atualiza sozinho conforme o post anda
  * pelas etapas — não precisa recarregar nada. Marcar como postado manda o
  * post direto pra "Publicado", o último estágio do pipeline.
+ *
+ * `fullPage`: usado na tela dedicada (menu "Checklist do dia") — sem limite
+ * de altura e com estado vazio explicado, em vez de sumir quando não há
+ * pendência (o widget do Painel some quando vazio; a página não).
  */
-export function DailyChecklist() {
+export function DailyChecklist({ fullPage = false }: { fullPage?: boolean }) {
   const posts = useData((s) => s.posts);
   const clientMap = useClientMap();
   const today = todayISO();
@@ -29,10 +34,19 @@ export function DailyChecklist() {
     };
   }, [posts, today]);
 
-  if (pendentes.length === 0 && feitos.length === 0) return null;
+  if (pendentes.length === 0 && feitos.length === 0) {
+    if (!fullPage) return null;
+    return (
+      <EmptyState
+        icon={<ListChecks size={40} />}
+        title="Nada pendente por hoje"
+        description="Assim que houver posts agendados pra hoje (ou atrasados), eles aparecem aqui pra marcar conforme forem saindo."
+      />
+    );
+  }
 
   return (
-    <div className="card mb-6 overflow-hidden">
+    <div className={cn('card overflow-hidden', !fullPage && 'mb-6')}>
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
           <h3 className="font-semibold text-white">Checklist do dia</h3>
@@ -41,7 +55,7 @@ export function DailyChecklist() {
           </p>
         </div>
       </div>
-      <div className="max-h-80 divide-y divide-line overflow-y-auto">
+      <div className={cn('divide-y divide-line', !fullPage && 'max-h-80 overflow-y-auto')}>
         {pendentes.map((p) => {
           const client = p.clientId ? clientMap[p.clientId] : undefined;
           const overdue = p.scheduledDate! < today;

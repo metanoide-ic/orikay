@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Sparkles, MessageCircle, Instagram, Bell, ShieldCheck, Check, Info, Receipt, Plug } from 'lucide-react';
+import { Sparkles, MessageCircle, Instagram, Bell, ShieldCheck, Check, Info, Receipt, Plug, Wand2, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { Field, Input, Textarea, Avatar, Badge } from '@/components/ui';
+import { Field, Input, Textarea, Avatar, Badge, Button } from '@/components/ui';
 import { useSettings } from '@/lib/settingsStore';
 import { useAuth } from '@/lib/authStore';
 import { useData } from '@/lib/dataStore';
 import { requestNotifyPermission } from '@/lib/notifications';
+import { buscarGruposDoConector, autoMatchGroups } from '@/lib/groupMatch';
 import { cn } from '@/lib/utils';
 
 function Section({ icon, title, desc, children, tint }: { icon: React.ReactNode; title: string; desc?: string; children: React.ReactNode; tint: string }) {
@@ -40,8 +41,29 @@ export default function Integrations() {
   const clients = useData((x) => x.clients);
   const [saved, setSaved] = useState(false);
   const [notifMsg, setNotifMsg] = useState('');
+  const [buscandoGrupos, setBuscandoGrupos] = useState(false);
+  const [grupoMsg, setGrupoMsg] = useState('');
 
   function flash() { setSaved(true); setTimeout(() => setSaved(false), 1500); }
+
+  async function buscarGrupos() {
+    setBuscandoGrupos(true);
+    setGrupoMsg('');
+    const r = await buscarGruposDoConector();
+    if (!r.ok) {
+      setGrupoMsg(r.erro || 'Não foi possível buscar os grupos.');
+      setBuscandoGrupos(false);
+      return;
+    }
+    const { casados, semGrupo } = autoMatchGroups(r.grupos);
+    setGrupoMsg(
+      casados === 0 && semGrupo.length === 0
+        ? 'Todos os clientes já tinham grupo cadastrado — nada pra casar.'
+        : `${casados} grupo(s) casado(s) automaticamente pelo nome.` +
+          (semGrupo.length > 0 ? ` ${semGrupo.length} sem grupo parecido: ${semGrupo.join(', ')} — confira o nome do grupo no WhatsApp.` : ''),
+    );
+    setBuscandoGrupos(false);
+  }
 
   return (
     <div>
@@ -88,7 +110,14 @@ export default function Integrations() {
             Enviar ao grupo automaticamente ao mover para “Aprovação”
           </label>
           <div>
-            <div className="mb-1.5 text-xs font-medium text-white/60">Grupos por cliente</div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium text-white/60">Grupos por cliente</div>
+              <Button size="sm" variant="outline" onClick={buscarGrupos} disabled={buscandoGrupos}>
+                {buscandoGrupos ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                Buscar grupos automaticamente
+              </Button>
+            </div>
+            {grupoMsg && <p className="mb-2.5 rounded-lg border border-line bg-white/[0.02] px-3 py-2 text-xs text-white/60">{grupoMsg}</p>}
             {clients.length === 0 ? (
               <p className="text-xs text-white/40">Cadastre clientes para mapear os grupos.</p>
             ) : (
@@ -103,6 +132,12 @@ export default function Integrations() {
               </div>
             )}
           </div>
+          <Note>
+            "Buscar grupos automaticamente" pede ao Conector a lista de grupos que a instância de
+            WhatsApp enxerga e casa cada cliente pelo nome — só preenche quem ainda está sem grupo
+            (nunca troca um que você já configurou à mão) e avisa quem não achou nome parecido, pra
+            conferir na mão. Precisa do Conector ligado.
+          </Note>
           <Note>
             Para a plataforma <b>ler</b> as respostas do grupo e aprovar sozinha, aponte o webhook de
             mensagens recebidas do seu provedor para o endereço de entrada que aparece na tela do
