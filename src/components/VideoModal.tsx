@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Trash2, Plus, X, Check, Link2, ExternalLink } from 'lucide-react';
 import { Modal, Button, Field, Input, Textarea, Select } from './ui';
 import { RevisionList } from './RevisionList';
@@ -21,8 +21,17 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
   const [ck, setCk] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!video) return null;
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => update(videoId, { mediaUrl: String(reader.result) });
+    reader.readAsDataURL(f);
+  }
 
   return (
     <Modal open onClose={onClose} wide title="Projeto de vídeo">
@@ -59,6 +68,30 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
             </Select>
           </Field>
           <Field label="Prazo"><Input type="date" value={video.dueDate ?? ''} onChange={(e) => update(videoId, { dueDate: e.target.value || undefined })} /></Field>
+        </div>
+
+        {/* Mídia de referência */}
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-white/60">Imagem de referência (capa, print, frame de exemplo)</div>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+          {video.mediaUrl ? (
+            <div className="relative w-fit">
+              <img src={video.mediaUrl} alt="" className="max-h-48 rounded-xl border border-line" />
+              <button
+                onClick={() => update(videoId, { mediaUrl: undefined })}
+                className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-white/70 ring-1 ring-line hover:text-red-300"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-2 rounded-xl border border-dashed border-line px-4 py-3 text-sm text-white/50 hover:border-brand-400/50 hover:text-white"
+            >
+              <Plus size={16} /> Anexar imagem
+            </button>
+          )}
         </div>
 
         {/* Links */}

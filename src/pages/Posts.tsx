@@ -15,7 +15,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy, horizontalLi
 import { CSS } from '@dnd-kit/utilities';
 import {
   Plus, CheckSquare, MessageSquare, AlertTriangle, LayoutGrid, CalendarDays, X, VideoOff, Trash2,
-  FolderOpen, Copy, Clapperboard, ArrowRightCircle, GripVertical,
+  FolderOpen, Copy, Clapperboard, ArrowRightCircle, GripVertical, ImageIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientFilter } from '@/components/ClientFilter';
@@ -68,11 +68,12 @@ export default function Posts() {
     const m: Record<string, Post[]> = {};
     STAGE_ORDER.forEach((s) => (m[s] = []));
     visible.forEach((p) => (m[p.stage] ??= []).push(p));
-    // Dentro de cada coluna, sempre em ordem de data de publicação — quem
-    // vem antes na fila é o que o designer precisa fazer primeiro. Sem
-    // data cai por último, não bagunça quem já tem prazo certo.
+    // Dentro de cada coluna, em ordem de data de publicação — quem vem antes
+    // na fila é o que o designer precisa fazer primeiro. Quem ainda não tem
+    // data (cartão recém-criado, só uma ideia solta) sobe pro topo — precisa
+    // de atenção (dar uma data) antes de quem já tem prazo certo.
     for (const s of STAGE_ORDER) {
-      m[s].sort((a, b) => (a.scheduledDate || '9999').localeCompare(b.scheduledDate || '9999'));
+      m[s].sort((a, b) => (a.scheduledDate || '').localeCompare(b.scheduledDate || ''));
     }
     return m;
   }, [visible]);
@@ -291,7 +292,7 @@ export default function Posts() {
         <DndContext sensors={sensors} collisionDetection={closestCorners}
           onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
           <SortableContext items={stageOrder.map((s) => `col-${s}`)} strategy={horizontalListSortingStrategy}>
-            <div className="flex gap-3 overflow-x-auto pb-4">
+            <div className="board-row flex gap-3 overflow-x-auto pb-4">
               {stageOrder.map((stage) => (
                 <StageList key={stage} stage={stage} posts={byStage[stage] || []} clientMap={clientMap}
                   selected={selected} onCardClick={handleCardClick}
@@ -363,7 +364,10 @@ function StageList({
 
   function add() {
     if (!title.trim()) return;
-    addPost({ title: title.trim(), platform: 'Instagram', stage, scheduledDate: todayISO() });
+    // Sem data: um cartão criado rápido assim é uma ideia solta, ainda sem
+    // prazo — por isso ele sobe pro topo da lista (quem não tem data vem
+    // primeiro), em vez de cair em algum lugar no meio da fila por data.
+    addPost({ title: title.trim(), platform: 'Instagram', stage });
     setTitle('');
   }
 
@@ -385,18 +389,10 @@ function StageList({
         <span className="rounded-full bg-white/10 px-2 text-xs text-white/50">{posts.length}</span>
       </div>
 
-      <div ref={setNodeRef} className={cn('flex-1 space-y-2 px-2 transition', isOver && 'bg-brand-500/[0.06]')}>
-        <SortableContext items={posts.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-          {posts.map((p) => (
-            <SortablePost key={p.id} post={p} clientMap={clientMap}
-              isSelected={selected.has(p.id)} onClick={(e) => onCardClick(p, e)}
-              onContextMenu={(e) => onCardContextMenu(p, e)} />
-          ))}
-        </SortableContext>
-        {posts.length === 0 && !adding && <div className="grid h-16 place-items-center rounded-lg text-xs text-white/25">Solte um cartão aqui</div>}
-      </div>
-
-      <div className="p-2">
+      {/* Adicionar cartão fica no topo — igual em qualquer app de anotação
+          rápida, o que você acabou de criar tem que aparecer na hora, sem
+          precisar procurar lá embaixo numa lista de centenas de cartões. */}
+      <div className="p-2 pb-0">
         {adding ? (
           <div className="rounded-lg border border-line bg-ink-850 p-2">
             <textarea value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do cartão…" autoFocus rows={2}
@@ -415,6 +411,17 @@ function StageList({
             <Plus size={15} /> Adicionar cartão
           </button>
         )}
+      </div>
+
+      <div ref={setNodeRef} className={cn('flex-1 space-y-2 p-2 transition', isOver && 'bg-brand-500/[0.06]')}>
+        <SortableContext items={posts.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+          {posts.map((p) => (
+            <SortablePost key={p.id} post={p} clientMap={clientMap}
+              isSelected={selected.has(p.id)} onClick={(e) => onCardClick(p, e)}
+              onContextMenu={(e) => onCardContextMenu(p, e)} />
+          ))}
+        </SortableContext>
+        {posts.length === 0 && <div className="grid h-16 place-items-center rounded-lg text-xs text-white/25">Solte um cartão aqui</div>}
       </div>
     </div>
   );
@@ -472,6 +479,7 @@ function PostCard({ post, clientMap, dragging, selected }: {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-white/45">
         <span className="text-white/40">{post.platform}</span>
+        {post.mediaUrl && <span className="inline-flex items-center gap-1 text-brand-300" title="Tem imagem anexada"><ImageIcon size={11} /></span>}
         {post.checklist.length > 0 && <span className="inline-flex items-center gap-1"><CheckSquare size={11} /> {done}/{post.checklist.length}</span>}
         {pendRev > 0 && <span className="inline-flex items-center gap-1 text-rose-300"><MessageSquare size={11} /> {pendRev}</span>}
         {post.sentForApproval && post.stage === 'aprovacao' && <Badge color="#ec4899">no grupo</Badge>}

@@ -238,6 +238,8 @@ export interface VideoProject {
   links: VideoLink[];
   checklist: ChecklistItem[];
   revisions: Revision[];
+  /** Imagem/thumbnail de referência (data URL) — capa, print, frame de exemplo. */
+  mediaUrl?: string;
   createdAt: number;
 }
 

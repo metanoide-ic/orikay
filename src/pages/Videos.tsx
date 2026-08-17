@@ -7,7 +7,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, CheckSquare, MessageSquare, Link2, Clapperboard, Trash2, X, FolderOpen, Copy, ArrowRightCircle, GripVertical } from 'lucide-react';
+import { Plus, CheckSquare, MessageSquare, Link2, Clapperboard, Trash2, X, FolderOpen, Copy, ArrowRightCircle, GripVertical, ImageIcon } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Field, Input, Modal, Select } from '@/components/ui';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
@@ -48,9 +48,10 @@ export default function Videos() {
     VIDEO_STAGE_ORDER.forEach((s) => (m[s] = []));
     videos.forEach((v) => (m[v.stage] ??= []).push(v));
     // Mesma lógica dos posts: por prazo, quem vence primeiro aparece
-    // primeiro — o editor não precisa garimpar qual vídeo é mais urgente.
+    // primeiro. Quem ainda não tem prazo sobe pro topo — é vídeo recém
+    // criado, precisa de atenção antes de quem já tem data certa.
     for (const s of VIDEO_STAGE_ORDER) {
-      m[s].sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+      m[s].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
     }
     return m;
   }, [videos]);
@@ -220,7 +221,7 @@ export default function Videos() {
       <DndContext sensors={sensors} collisionDetection={pointerWithin}
         onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
         <SortableContext items={stageOrder.map((s) => `col-${s}`)} strategy={horizontalListSortingStrategy}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="board-row flex gap-4 overflow-x-auto pb-4">
             {stageOrder.map((stage) => (
               <VideoColumn key={stage} stage={stage} videos={byStage[stage] || []} clientMap={clientMap}
                 selected={selected} onCardClick={handleCardClick}
@@ -357,6 +358,7 @@ function VideoCard({ video, clientMap, dragging, selected }: {
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-white/45">
             {client && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full" style={{ background: client.color }} />{client.name}</span>}
             {video.links.length > 0 && <span className="inline-flex items-center gap-1"><Link2 size={11} /> {video.links.length}</span>}
+            {video.mediaUrl && <span className="inline-flex items-center gap-1 text-brand-300" title="Tem imagem anexada"><ImageIcon size={11} /></span>}
             {video.checklist.length > 0 && <span className="inline-flex items-center gap-1"><CheckSquare size={11} /> {done}/{video.checklist.length}</span>}
             {pendRev > 0 && <span className="inline-flex items-center gap-1 text-rose-300"><MessageSquare size={11} /> {pendRev}</span>}
             {video.dueDate && <span className={cn('ml-auto', late && 'text-red-300')}>{new Date(video.dueDate + 'T00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>}
