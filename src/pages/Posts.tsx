@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -134,22 +135,26 @@ export default function Posts() {
     if (view !== 'pipeline') return; // só faz sentido no quadro, não no calendário
     if (e.button !== 0) return; // só botão esquerdo
     const target = e.target as HTMLElement;
-    if (target.closest('[data-post-id], button, textarea, input, select, a')) return;
+    if (target.closest('[data-post-id], [data-col-handle], button, textarea, input, select, a')) return;
     const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-    const x1 = e.clientX, y1 = e.clientY;
+    const x1 = e.clientX;
+    let y1 = e.clientY;
     let x2 = x1, y2 = y1;
     setMarquee({ x1, y1, x2, y2 });
 
     // Auto-scroll: se o mouse fica perto da borda da tela enquanto arrasta,
     // rola a página sozinha, pra dar pra alcançar os cards mais abaixo sem
-    // ficar "preso" no que já está visível.
+    // ficar "preso" no que já está visível. O canto onde o arrasto começou
+    // (y1) é um ponto fixo da PÁGINA, não da tela — por isso ele tem que
+    // subir na tela conforme rola, senão o retângulo fica "preso" num
+    // pedaço fixo enquanto o conteúdo passa por baixo dele.
     const BORDA = 56;
     let velocidade = 0;
     let raf = 0;
     function passoScroll() {
       if (velocidade !== 0) {
         window.scrollBy(0, velocidade);
-        y2 += velocidade; // acompanha o scroll pra manter o retângulo correto
+        y1 -= velocidade;
         setMarquee({ x1, y1, x2, y2 });
       }
       raf = requestAnimationFrame(passoScroll);
@@ -302,14 +307,15 @@ export default function Posts() {
         </DndContext>
       )}
 
-      {marquee && (
+      {marquee && createPortal(
         <div
           className="pointer-events-none fixed z-50 border border-brand-400/60 bg-brand-500/15"
           style={{
             left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
             width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
           }}
-        />
+        />,
+        document.body,
       )}
 
       {contextMenu && (
@@ -372,7 +378,7 @@ function StageList({
         área de soltar cartão (mesmo espaço, dois alvos), e o dnd-kit não
         saberia pra qual dos dois resolver o drop.
       */}
-      <div ref={setColRef} {...attributes} {...listeners} className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing">
+      <div ref={setColRef} {...attributes} {...listeners} data-col-handle className="flex cursor-grab items-center gap-2 px-3 py-2.5 active:cursor-grabbing">
         <GripVertical size={14} className="text-white/20" />
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: meta.color }} />
         <span className="text-sm font-semibold text-white/90">{meta.label}</span>

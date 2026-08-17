@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, pointerWithin,
@@ -83,19 +84,24 @@ export default function Videos() {
   function onBoardMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('[data-video-id], button, textarea, input, select, a')) return;
+    if (target.closest('[data-video-id], [data-col-handle], button, textarea, input, select, a')) return;
     const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-    const x1 = e.clientX, y1 = e.clientY;
+    const x1 = e.clientX;
+    let y1 = e.clientY;
     let x2 = x1, y2 = y1;
     setMarquee({ x1, y1, x2, y2 });
 
+    // O canto onde o arrasto começou (y1) é um ponto fixo da PÁGINA, não da
+    // tela — por isso ele tem que subir na tela conforme rola, senão o
+    // retângulo fica "preso" num pedaço fixo enquanto o conteúdo passa por
+    // baixo dele.
     const BORDA = 56;
     let velocidade = 0;
     let raf = 0;
     function passoScroll() {
       if (velocidade !== 0) {
         window.scrollBy(0, velocidade);
-        y2 += velocidade;
+        y1 -= velocidade;
         setMarquee({ x1, y1, x2, y2 });
       }
       raf = requestAnimationFrame(passoScroll);
@@ -229,14 +235,15 @@ export default function Videos() {
         </DragOverlay>
       </DndContext>
 
-      {marquee && (
+      {marquee && createPortal(
         <div
           className="pointer-events-none fixed z-50 border border-brand-400/60 bg-brand-500/15"
           style={{
             left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
             width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
           }}
-        />
+        />,
+        document.body,
       )}
 
       {contextMenu && (
@@ -300,7 +307,7 @@ function VideoColumn({ stage, videos, clientMap, selected, onCardClick, onCardCo
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
       className="flex w-72 shrink-0 flex-col"
     >
-      <div ref={setColRef} {...attributes} {...listeners} className="mb-2 flex cursor-grab items-center gap-2 px-1 active:cursor-grabbing">
+      <div ref={setColRef} {...attributes} {...listeners} data-col-handle className="mb-2 flex cursor-grab items-center gap-2 px-1 active:cursor-grabbing">
         <GripVertical size={14} className="text-white/20" />
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: meta.color }} />
         <span className="text-sm font-semibold text-white/85">{meta.label}</span>
