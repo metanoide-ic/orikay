@@ -34,6 +34,11 @@ export default function Videos() {
     const m: Record<string, VideoProject[]> = {};
     VIDEO_STAGE_ORDER.forEach((s) => (m[s] = []));
     videos.forEach((v) => (m[v.stage] ??= []).push(v));
+    // Mesma lógica dos posts: por prazo, quem vence primeiro aparece
+    // primeiro — o editor não precisa garimpar qual vídeo é mais urgente.
+    for (const s of VIDEO_STAGE_ORDER) {
+      m[s].sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+    }
     return m;
   }, [videos]);
 

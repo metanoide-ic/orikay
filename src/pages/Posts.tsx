@@ -51,6 +51,12 @@ export default function Posts() {
     const m: Record<string, Post[]> = {};
     STAGE_ORDER.forEach((s) => (m[s] = []));
     visible.forEach((p) => (m[p.stage] ??= []).push(p));
+    // Dentro de cada coluna, sempre em ordem de data de publicação — quem
+    // vem antes na fila é o que o designer precisa fazer primeiro. Sem
+    // data cai por último, não bagunça quem já tem prazo certo.
+    for (const s of STAGE_ORDER) {
+      m[s].sort((a, b) => (a.scheduledDate || '9999').localeCompare(b.scheduledDate || '9999'));
+    }
     return m;
   }, [visible]);
 
