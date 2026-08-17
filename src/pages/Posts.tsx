@@ -12,11 +12,15 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, CheckSquare, MessageSquare, AlertTriangle, LayoutGrid, CalendarDays, X, VideoOff, Trash2 } from 'lucide-react';
+import {
+  Plus, CheckSquare, MessageSquare, AlertTriangle, LayoutGrid, CalendarDays, X, VideoOff, Trash2,
+  FolderOpen, Copy, Clapperboard, ArrowRightCircle,
+} from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientFilter } from '@/components/ClientFilter';
 import { Button, Badge, Avatar, Select } from '@/components/ui';
 import { PostsCalendar } from '@/components/PostsCalendar';
+import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
 import { useClientMap } from '@/lib/hooks';
@@ -27,7 +31,7 @@ import type { Post, PostStage } from '@/lib/types';
 import { PostModal } from '@/components/PostModal';
 
 export default function Posts() {
-  const { posts, clients, movePost, removePost } = useData();
+  const { posts, clients, movePost, removePost, updatePost, addPost } = useData();
   const clientMap = useClientMap();
   const [openId, setOpenId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -39,6 +43,11 @@ export default function Posts() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lastClicked, setLastClicked] = useState<string | null>(null);
   const [bulkTarget, setBulkTarget] = useState<PostStage>('ideia');
+
+  // Seleção por arrasto (marquee), igual selecionar ícones na área de trabalho.
+  const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  // Menu de botão direito num card específico.
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; post: Post } | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -106,6 +115,71 @@ export default function Posts() {
     setSelected(new Set());
   }
 
+  /** Clica e arrasta numa área vazia do quadro pra selecionar vários cards de uma vez. */
+  function onBoardMouseDown(e: React.MouseEvent) {
+    if (e.button !== 0) return; // só botão esquerdo
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-post-id], button, textarea, input, select, a')) return;
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+    const x1 = e.clientX, y1 = e.clientY;
+    let x2 = x1, y2 = y1;
+    setMarquee({ x1, y1, x2, y2 });
+
+    function onMove(ev: MouseEvent) {
+      x2 = ev.clientX; y2 = ev.clientY;
+      setMarquee({ x1, y1, x2, y2 });
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const rect = { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) };
+      // Só conta como arrasto de verdade — um clique parado não deve mexer na seleção.
+      if (rect.right - rect.left > 4 || rect.bottom - rect.top > 4) {
+        const hits = new Set<string>();
+        document.querySelectorAll('[data-post-id]').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.left < rect.right && r.right > rect.left && r.top < rect.bottom && r.bottom > rect.top) {
+            hits.add(el.getAttribute('data-post-id')!);
+          }
+        });
+        setSelected((prev) => (additive ? new Set([...prev, ...hits]) : hits));
+      }
+      setMarquee(null);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  function contextItemsFor(post: Post): ContextMenuItem[] {
+    const outrasEtapas = STAGE_ORDER.filter((s) => s !== post.stage);
+    return [
+      { label: 'Abrir', icon: <FolderOpen size={15} />, onSelect: () => setOpenId(post.id) },
+      {
+        label: post.awaitingMaterial ? 'Desmarcar pendência de gravação' : 'Marcar pendência de gravação',
+        icon: <Clapperboard size={15} />,
+        onSelect: () => updatePost(post.id, { awaitingMaterial: !post.awaitingMaterial }),
+      },
+      {
+        label: 'Duplicar',
+        icon: <Copy size={15} />,
+        onSelect: () => addPost({
+          title: post.title + ' (cópia)', platform: post.platform, clientId: post.clientId,
+          stage: post.stage, scheduledDate: post.scheduledDate, caption: post.caption, copy: post.copy,
+          notes: post.notes, awaitingMaterial: post.awaitingMaterial,
+        }),
+      },
+      ...outrasEtapas.map((s) => ({
+        label: `Mover para ${STAGE_META[s].label}`,
+        icon: <ArrowRightCircle size={15} />,
+        onSelect: () => {
+          movePost(post.id, s, (byStage[s] || []).length);
+          onPostStageChange(post.id, post.stage, s);
+        },
+      })),
+      { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => removePost(post.id) },
+    ];
+  }
+
   function stageOf(id: string): PostStage | undefined {
     if ((STAGE_ORDER as string[]).includes(id)) return id as PostStage;
     return posts.find((p) => p.id === id)?.stage;
@@ -152,14 +226,29 @@ export default function Posts() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners}
           onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-4">
+          <div className="flex gap-3 overflow-x-auto pb-4" onMouseDown={onBoardMouseDown}>
             {STAGE_ORDER.map((stage) => (
               <StageList key={stage} stage={stage} posts={byStage[stage] || []} clientMap={clientMap}
-                selected={selected} onCardClick={handleCardClick} />
+                selected={selected} onCardClick={handleCardClick}
+                onCardContextMenu={(post, e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, post }); }} />
             ))}
           </div>
           <DragOverlay>{activePost ? <PostCard post={activePost} clientMap={clientMap} dragging /> : null}</DragOverlay>
         </DndContext>
+      )}
+
+      {marquee && (
+        <div
+          className="pointer-events-none fixed z-50 border border-brand-400/60 bg-brand-500/15"
+          style={{
+            left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
+            width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
+          }}
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} items={contextItemsFor(contextMenu.post)} onClose={() => setContextMenu(null)} />
       )}
 
       {openId && <PostModal postId={openId} onClose={() => setOpenId(null)} />}
@@ -183,13 +272,14 @@ export default function Posts() {
 // (Criação agora é feita direto em cada lista, no estilo Trello.)
 
 function StageList({
-  stage, posts, clientMap, selected, onCardClick,
+  stage, posts, clientMap, selected, onCardClick, onCardContextMenu,
 }: {
   stage: PostStage;
   posts: Post[];
   clientMap: ReturnType<typeof useClientMap>;
   selected: Set<string>;
   onCardClick: (post: Post, e: React.MouseEvent) => void;
+  onCardContextMenu: (post: Post, e: React.MouseEvent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const addPost = useData((s) => s.addPost);
@@ -215,7 +305,8 @@ function StageList({
         <SortableContext items={posts.map((p) => p.id)} strategy={verticalListSortingStrategy}>
           {posts.map((p) => (
             <SortablePost key={p.id} post={p} clientMap={clientMap}
-              isSelected={selected.has(p.id)} onClick={(e) => onCardClick(p, e)} />
+              isSelected={selected.has(p.id)} onClick={(e) => onCardClick(p, e)}
+              onContextMenu={(e) => onCardContextMenu(p, e)} />
           ))}
         </SortableContext>
         {posts.length === 0 && !adding && <div className="grid h-16 place-items-center rounded-lg text-xs text-white/25">Solte um cartão aqui</div>}
@@ -245,13 +336,14 @@ function StageList({
   );
 }
 
-function SortablePost({ post, onClick, clientMap, isSelected }: {
-  post: Post; onClick: (e: React.MouseEvent) => void; clientMap: ReturnType<typeof useClientMap>; isSelected: boolean;
+function SortablePost({ post, onClick, onContextMenu, clientMap, isSelected }: {
+  post: Post; onClick: (e: React.MouseEvent) => void; onContextMenu: (e: React.MouseEvent) => void;
+  clientMap: ReturnType<typeof useClientMap>; isSelected: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: post.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick}>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} data-post-id={post.id} onClick={onClick} onContextMenu={onContextMenu}>
       <PostCard post={post} clientMap={clientMap} selected={isSelected} />
     </div>
   );

@@ -13,6 +13,7 @@ import {
 import { CalendarCheck, ArrowUpRight } from 'lucide-react';
 import type { Post } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
+import { DailyChecklist } from '@/components/DailyChecklist';
 import { Badge, Stat } from '@/components/ui';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
@@ -106,6 +107,8 @@ export default function Dashboard() {
         title="Painel"
         subtitle="Visão geral da agência."
       />
+
+      <DailyChecklist />
 
       {canFinance ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
