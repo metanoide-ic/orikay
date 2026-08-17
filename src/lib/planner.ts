@@ -53,8 +53,6 @@ export interface PlanItem {
   brief: string;
 }
 
-const WEEKDAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-
 function iso(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
@@ -178,22 +176,17 @@ function dueDateFor(publishDate: string): string {
 
 export interface ApplyResult {
   posts: number;
-  cards: number;
   videos: number;
-  boardId: string;
 }
 
 /**
- * Envia o plano para produção: cria os posts no pipeline, as tarefas no quadro
- * do cliente (com prazo) e os projetos de vídeo. Itens já existentes (mesmo
- * título e data) são pulados, então gerar de novo não duplica.
+ * Envia o plano para produção: cria os posts no pipeline e os projetos de
+ * vídeo. Itens já existentes (mesmo título e data) são pulados, então gerar
+ * de novo não duplica.
  */
 export function applyPlanToWorkspace(client: Client, items: PlanItem[]): ApplyResult {
   const store = useData.getState();
-  const board = store.ensureClientBoard(client.id, `Produção: ${client.name}`);
-  const firstCol = board.columns[0]?.id;
-  const existingCards = new Set(Object.values(board.cards).map((c) => `${c.title}|${c.dueDate}`));
-  let posts = 0, cards = 0, videos = 0;
+  let posts = 0, videos = 0;
 
   for (const item of items) {
     const due = dueDateFor(item.date);
@@ -209,24 +202,12 @@ export function applyPlanToWorkspace(client: Client, items: PlanItem[]): ApplyRe
         clientId: client.id,
         stage: 'ideia',
         scheduledDate: item.date,
-        // Sem material de vídeo em mãos, o post já nasce marcado — o quadro
+        // Sem material de vídeo em mãos, o post já nasce marcado — a lista
         // mostra o selo "falta material" sem precisar abrir o card.
         awaitingMaterial: isVideo,
         notes: item.brief + (item.holiday ? `\n\nData comemorativa: ${item.holiday}.` : ''),
       });
       posts++;
-    }
-
-    if (firstCol && !existingCards.has(`${item.title}|${due}`)) {
-      store.addCard(board.id, firstCol, {
-        title: item.title,
-        dueDate: due,
-        clientId: client.id,
-        labels: [isVideo ? 'Vídeo' : 'Design'],
-        description: `${item.brief}\n\nPublicação prevista para ${new Date(item.date + 'T00:00').toLocaleDateString('pt-BR')} (${WEEKDAYS[new Date(item.date + 'T00:00').getDay()]}).${item.holiday ? ` Data comemorativa: ${item.holiday}.` : ''}`,
-      });
-      existingCards.add(`${item.title}|${due}`);
-      cards++;
     }
 
     if (isVideo) {
@@ -242,8 +223,8 @@ export function applyPlanToWorkspace(client: Client, items: PlanItem[]): ApplyRe
     channel: 'sistema',
     title: `Planejamento de ${client.name} enviado para produção`,
     status: 'ok',
-    detail: `${posts} posts, ${cards} tarefas e ${videos} vídeos criados com prazos.`,
+    detail: `${posts} posts e ${videos} vídeos criados com prazos.`,
   });
 
-  return { posts, cards, videos, boardId: board.id };
+  return { posts, videos };
 }

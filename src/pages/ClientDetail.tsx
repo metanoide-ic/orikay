@@ -13,26 +13,17 @@ export default function ClientDetail() {
   const { clientId = '' } = useParams();
   const client = useData((s) => s.clients.find((c) => c.id === clientId));
   const posts = useData((s) => s.posts);
-  const boards = useData((s) => s.boards);
   const videos = useData((s) => s.videos);
   const transactions = useData((s) => s.transactions);
   const canFinance = !!useAuth((s) => s.current()?.canFinance);
 
   const data = useMemo(() => {
     const cposts = posts.filter((p) => p.clientId === clientId);
-    const ctasks: { title: string; boardId: string; boardName: string; column: string }[] = [];
-    boards.forEach((b) => {
-      const colById = Object.fromEntries(b.columns.map((c) => [c.id, c.title]));
-      b.columns.forEach((col) => col.cardIds.forEach((id) => {
-        const card = b.cards[id];
-        if (card?.clientId === clientId) ctasks.push({ title: card.title, boardId: b.id, boardName: b.name, column: colById[col.id] });
-      }));
-    });
     const cvideos = videos.filter((v) => v.clientId === clientId);
     const ctx = transactions.filter((t) => t.clientId === clientId);
     const receita = ctx.filter((t) => t.type === 'receita' && t.status === 'pago').reduce((a, t) => a + t.amount, 0);
-    return { cposts, ctasks, cvideos, ctx, receita };
-  }, [posts, boards, videos, transactions, clientId]);
+    return { cposts, cvideos, ctx, receita };
+  }, [posts, videos, transactions, clientId]);
 
   if (!client) {
     return (
@@ -90,7 +81,6 @@ export default function ClientDetail() {
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {canFinance && <Stat label="Receita (paga)" value={money(data.receita)} valueColor="#34d399" />}
         <Stat label="Posts" value={String(data.cposts.length)} dot="#7c5cff" />
-        <Stat label="Tarefas" value={String(data.ctasks.length)} dot="#38bdf8" />
         <Stat label="Vídeos" value={String(data.cvideos.length)} dot="#a855f7" />
       </div>
 
@@ -102,13 +92,6 @@ export default function ClientDetail() {
               left={<span className="h-2 w-2 rounded-full" style={{ background: PLATFORM_COLOR[p.platform] }} />}
               right={<Badge color={STAGE_META[p.stage].color}>{STAGE_META[p.stage].label}</Badge>} />
           )) : <Empty label="Nenhum post para este cliente." />}
-        </Panel>
-
-        {/* Tarefas */}
-        <Panel title="Tarefas" to="/app/quadros" linkLabel="Ver quadros">
-          {data.ctasks.length ? data.ctasks.slice(0, 8).map((t, i) => (
-            <Row key={i} title={t.title} left={<span className="h-2 w-2 rounded-full bg-brand-400" />} right={<Badge>{t.column}</Badge>} />
-          )) : <Empty label="Nenhuma tarefa vinculada." />}
         </Panel>
 
         {/* Vídeos */}

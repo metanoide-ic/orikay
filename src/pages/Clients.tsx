@@ -66,7 +66,7 @@ export default function Clients() {
     if (comCadencia.length === 0) { setBatchMsg('Nenhum cliente com cadência semanal preenchida.'); return; }
 
     setBatchBusy(true);
-    let posts = 0, cards = 0, videos = 0, feitos = 0;
+    let posts = 0, videos = 0, feitos = 0;
     for (const c of comCadencia) {
       const slots = buildClientSlots(c, year, month);
       if (slots.length === 0) continue;
@@ -74,14 +74,14 @@ export default function Clients() {
       const titles = await generatePlanIdeas(c, slots);
       const itens = slots.map((slot, i) => ({ ...slot, title: titles[i] ?? slot.title }));
       const r = applyPlanToWorkspace(c, itens);
-      posts += r.posts; cards += r.cards; videos += r.videos; feitos++;
+      posts += r.posts; videos += r.videos; feitos++;
     }
     setBatchBusy(false);
     setBatchMsg(
-      posts + cards + videos === 0
+      posts + videos === 0
         ? `O mês de ${label} já estava planejado: nada novo a criar. Rodar de novo não duplica.`
         : `Planejamento de ${label} gerado para ${feitos} cliente(s): ` +
-          `${posts} post(s), ${videos} vídeo(s) e ${cards} cartão(ões) nos quadros. ` +
+          `${posts} post(s) e ${videos} vídeo(s). ` +
           `Quem não tem cadência (agentes Omni e clientes sob demanda) ficou de fora de propósito.`,
     );
   }

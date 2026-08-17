@@ -40,7 +40,7 @@ export function PlanModal({ client, onClose }: { client: Client; onClose: () => 
 
   function enviar() {
     const res = applyPlanToWorkspace(client, items);
-    setSentMsg(`${res.posts} posts, ${res.cards} tarefas e ${res.videos} vídeos criados. O quadro do cliente já está pronto para o designer.`);
+    setSentMsg(`${res.posts} posts e ${res.videos} vídeos criados. Já estão prontos no pipeline pra equipe seguir.`);
   }
 
   const semCadencia = !client.weeklyPlan || Object.values(client.weeklyPlan).every((v) => !v.length);
@@ -100,7 +100,7 @@ export function PlanModal({ client, onClose }: { client: Client; onClose: () => 
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-3 text-sm text-emerald-200">
             {sentMsg}
             <div className="mt-2 flex gap-2">
-              <Button size="sm" variant="soft" onClick={() => { onClose(); navigate('/app/quadros'); }}>Abrir quadros</Button>
+              <Button size="sm" variant="soft" onClick={() => { onClose(); navigate('/app/posts'); }}>Abrir Posts</Button>
               <Button size="sm" variant="ghost" onClick={onClose}>Fechar</Button>
             </div>
           </div>

@@ -2,8 +2,8 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, KanbanSquare, Wallet, Users, Settings, LogOut,
-  Menu, X, Clapperboard, Library, Zap, Plug, Bell, AlertTriangle, Building2, Columns3, Megaphone, ListChecks,
+  KanbanSquare, Wallet, Users, Settings, LogOut,
+  Menu, X, Clapperboard, Library, Zap, Plug, Bell, AlertTriangle, Building2, Megaphone, ListChecks,
 } from 'lucide-react';
 import { Logo, LogoMark } from './Logo';
 import { Avatar } from './ui';
@@ -16,18 +16,17 @@ import { autoSendDueCharges } from '@/lib/billing';
 import { generateMonthlyExpenses } from '@/lib/expenses';
 import { cn } from '@/lib/utils';
 
-interface NavDef { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; }
+interface NavDef { to: string; label: string; icon: typeof KanbanSquare; end?: boolean; }
 
 function useNav(): NavDef[] {
   const canFinance = useAuth((s) => s.current()?.canFinance);
-  // Ordem pedida: Quadros primeiro, o resto da rotina de conteúdo logo
-  // depois, e Financeiro/Automações/Clientes/Equipe/Integrações no final,
+  // Posts é a tela principal — todo o fluxo (produção, aprovação, publicação)
+  // vive nela. Financeiro/Automações/Clientes/Equipe/Integrações no final,
   // fechando com o Checklist do dia.
   const items: NavDef[] = [
-    { to: '/app/quadros', label: 'Quadros', icon: Columns3 },
     { to: '/app/posts', label: 'Posts', icon: KanbanSquare },
     { to: '/app/videos', label: 'Vídeos', icon: Clapperboard },
-    { to: '/app/painel', label: 'Painel', icon: LayoutDashboard },
+    { to: '/app/checklist', label: 'Checklist do dia', icon: ListChecks },
     { to: '/app/trafego', label: 'Tráfego', icon: Megaphone },
     { to: '/app/biblioteca', label: 'Biblioteca', icon: Library },
   ];
@@ -37,7 +36,6 @@ function useNav(): NavDef[] {
     { to: '/app/clientes', label: 'Clientes', icon: Building2 },
     { to: '/app/equipe', label: 'Equipe', icon: Users },
     { to: '/app/integracoes', label: 'Integrações', icon: Plug },
-    { to: '/app/checklist', label: 'Checklist do dia', icon: ListChecks },
   );
   return items;
 }

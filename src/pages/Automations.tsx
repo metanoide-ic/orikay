@@ -2,15 +2,14 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MessageCircle, Instagram, Cpu, Sparkles, Trash2, Zap, ArrowRight, Settings2,
-  Send, RefreshCw, Rocket, Receipt, CircleDollarSign, CalendarCheck, ChevronDown,
+  Send, Receipt, CircleDollarSign, CalendarCheck, ChevronDown,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Badge, EmptyState, Switch } from '@/components/ui';
 import { useData } from '@/lib/dataStore';
 import { useSettings } from '@/lib/settingsStore';
-import { AUTOMATION_META } from '@/lib/labels';
 import { cn } from '@/lib/utils';
-import type { AutomationEvent, ColumnAutomation, EventChannel, EventStatus } from '@/lib/types';
+import type { AutomationEvent, EventChannel, EventStatus } from '@/lib/types';
 
 const CH: Record<EventChannel, { icon: typeof Cpu; color: string; label: string }> = {
   whatsapp: { icon: MessageCircle, color: '#25D366', label: 'WhatsApp' },
@@ -80,29 +79,17 @@ const FLOWS = [
     steps: ['Cobrança gerada no vencimento', 'Enviada no WhatsApp com Pix/boleto', 'Cliente paga', 'Asaas avisa o conector', 'Baixa automática no caixa'],
     note: 'Se o cliente perguntar valor, vencimento ou Pix no WhatsApp, o conector responde sozinho — sem precisar abrir a plataforma.',
   },
-  {
-    id: 'quadros',
-    label: 'Quadros',
-    steps: ['Cartão arrastado pra coluna marcada', 'Envio: manda pro grupo do cliente', 'Alteração: acumula pedidos no checklist', 'Post: publica feed + story'],
-    note: 'A automação de cada coluna é escolhida por você (menu "⋮" da coluna) — nem toda coluna precisa ter uma.',
-  },
 ] as const;
 
 /* -------------------------------- Página -------------------------------- */
 export default function Automations() {
-  const { events, clearEvents, boards } = useData();
+  const { events, clearEvents } = useData();
   const s = useSettings();
   const wppOk = Boolean(s.whatsappWebhook);
   const pubOk = Boolean(s.publishWebhook);
   const gatewayOk = Boolean(s.connectorUrl); // confirmação automática de pagamento depende do conector com Asaas
   const [flow, setFlow] = useState<(typeof FLOWS)[number]['id']>('posts');
   const [filtro, setFiltro] = useState<'todos' | EventChannel>('todos');
-
-  const automationCols = useMemo(() => {
-    const contagem: Record<ColumnAutomation, number> = { nenhuma: 0, envio: 0, alteracao: 0, post: 0 };
-    boards.forEach((b) => b.columns.forEach((c) => { if (c.automation) contagem[c.automation]++; }));
-    return contagem;
-  }, [boards]);
 
   const eventosFiltrados = useMemo(
     () => events.filter((e) => filtro === 'todos' || e.channel === filtro),
@@ -161,39 +148,14 @@ export default function Automations() {
         />
       </div>
 
-      {/* Automações dos Quadros */}
-      <div className="card mb-6 p-5">
-        <div className="mb-3 flex items-center gap-2 text-white"><Zap size={18} className="text-brand-300" /><h3 className="font-semibold">Colunas de Quadros com automação</h3></div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {(['envio', 'alteracao', 'post'] as const).map((a) => {
-            const meta = AUTOMATION_META[a];
-            const Icon = a === 'envio' ? Send : a === 'alteracao' ? RefreshCw : Rocket;
-            return (
-              <div key={a} className="flex items-center gap-3 rounded-xl border border-line/60 px-3.5 py-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: `${meta.color}1c`, color: meta.color }}>
-                  <Icon size={16} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white">{meta.label}</p>
-                  <p className="text-xs text-white/40">{automationCols[a]} coluna(s) usando</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <Link to="/app/quadros" className="mt-3 inline-flex items-center gap-1 text-xs text-brand-300 hover:text-brand-200">
-          Ver Quadros <ArrowRight size={12} />
-        </Link>
-      </div>
-
       {/* Checklist do dia */}
       <div className="card mb-6 flex items-center gap-3.5 p-4">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-500/15 text-brand-300"><CalendarCheck size={18} /></span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-white">Checklist do dia</p>
-          <p className="mt-0.5 text-xs text-white/50">Sempre ativo no Painel — mostra o que precisa sair hoje e atualiza sozinho conforme cada post é publicado.</p>
+          <p className="mt-0.5 text-xs text-white/50">Mostra o que precisa sair hoje e atualiza sozinho conforme cada post é publicado.</p>
         </div>
-        <Link to="/app/painel" className="shrink-0 text-xs text-brand-300 hover:text-brand-200">Ver Painel</Link>
+        <Link to="/app/checklist" className="shrink-0 text-xs text-brand-300 hover:text-brand-200">Ver Checklist</Link>
       </div>
 
       {/* Como cada fluxo funciona */}

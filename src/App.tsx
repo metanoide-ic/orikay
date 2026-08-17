@@ -5,10 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { FirstPassword } from '@/components/FirstPassword';
 import Landing from '@/pages/Landing';
 import Auth from '@/pages/Auth';
-import Dashboard from '@/pages/Dashboard';
 import Checklist from '@/pages/Checklist';
-import Boards from '@/pages/Boards';
-import BoardView from '@/pages/BoardView';
 import Finance from '@/pages/Finance';
 import Posts from '@/pages/Posts';
 import Videos from '@/pages/Videos';
@@ -62,10 +59,7 @@ export default function App() {
 
         {/* O quadro de posts é a tela principal da plataforma. */}
         <Route path="/app" element={<Navigate to="/app/posts" replace />} />
-        <Route path="/app/painel" element={<Protected><Dashboard /></Protected>} />
         <Route path="/app/checklist" element={<Protected><Checklist /></Protected>} />
-        <Route path="/app/quadros" element={<Protected><Boards /></Protected>} />
-        <Route path="/app/quadros/:boardId" element={<Protected><BoardView /></Protected>} />
         <Route path="/app/posts" element={<Protected><Posts /></Protected>} />
         <Route path="/app/videos" element={<Protected><Videos /></Protected>} />
         <Route path="/app/trafego" element={<Protected><Traffic /></Protected>} />
