@@ -53,6 +53,8 @@ export interface PlanItem {
   brief: string;
   /** Texto pra escrever na arte/capa — o que o designer coloca na peça, diferente da legenda. */
   arte: string;
+  /** Legenda do post (Instagram etc.) já pronta pra publicar, ou o roteiro completo quando é vídeo. */
+  caption: string;
 }
 
 function iso(y: number, m: number, d: number) {
@@ -64,20 +66,28 @@ function isVideoType(type: string): boolean {
 }
 
 /**
- * Ângulos editoriais do gerador local de temas. Cada um já vem com a
- * instrução do formato — foto pede o material real, vídeo vem com roteiro
- * de gancho/conteúdo/CTA — pra ninguém abrir o card sem saber o que fazer.
+ * Ângulos editoriais do gerador local — usado quando não há IA configurada,
+ * ou como ponto de partida pra IA lapidar em cima do briefing real do
+ * cliente. Pool grande de propósito: com a memória por cliente (nunca repete
+ * antes de passar por todos), quanto maior o pool, mais tempo até repetir
+ * de verdade um ângulo pro mesmo cliente.
  */
 const ANGLES = {
   foto: [
     { titulo: 'Dica prática para o público', material: 'foto real do produto, ambiente ou equipe relacionada à dica', arte: '[NÚMERO] DICA(S) PRA [RESULTADO QUE O PÚBLICO QUER]' },
-    { titulo: 'Bastidores do trabalho', material: 'foto tirada no local, mostrando a equipe ou o processo em ação', arte: 'BASTIDORES: COMO A GENTE FAZ ACONTECER' },
     { titulo: 'Prova social com resultado de cliente', material: 'foto do resultado entregue, ou print do depoimento do cliente', arte: 'MAIS UM CLIENTE SATISFEITO' },
     { titulo: 'Mito e verdade do segmento', material: 'foto de produto ou ambiente que ilustre o tema (pode ser de estúdio)', arte: 'MITO OU VERDADE?' },
-    { titulo: 'Apresentação de produto ou serviço', material: 'foto real do produto/serviço em destaque, boa iluminação', arte: '[NOME DO PRODUTO/SERVIÇO]' },
-    { titulo: 'Conteúdo educativo sobre o segmento', material: 'foto de apoio ao tema (pode ser de estúdio, sem precisar do cliente)', arte: 'VOCÊ SABIA?' },
-    { titulo: 'Depoimento ou avaliação', material: 'print do depoimento ou foto do cliente satisfeito (pedir autorização)', arte: '"[FRASE CURTA DO DEPOIMENTO]"' },
-    { titulo: 'Oferta ou condição comercial', material: 'foto do produto com destaque para o preço/condição', arte: '[CONDIÇÃO/OFERTA] — POR TEMPO LIMITADO' },
+    { titulo: 'Apresentação de produto ou serviço em destaque', material: 'foto real do produto/serviço em destaque, boa iluminação', arte: '[NOME DO PRODUTO/SERVIÇO]' },
+    { titulo: 'Depoimento ou avaliação de cliente real', material: 'print do depoimento ou foto do cliente satisfeito (pedir autorização)', arte: '"[FRASE CURTA DO DEPOIMENTO]"' },
+    { titulo: 'Oferta ou condição comercial do mês', material: 'foto do produto com destaque para o preço/condição', arte: '[CONDIÇÃO/OFERTA] — POR TEMPO LIMITADO' },
+    { titulo: 'Erro comum que o público comete', material: 'foto de produto/ambiente que ilustre o erro ou a solução', arte: 'O ERRO QUE QUASE TODO MUNDO COMETE' },
+    { titulo: 'Comparativo: com vs. sem o produto/serviço', material: 'foto de antes/depois ou comparação lado a lado', arte: 'FAZ TODA A DIFERENÇA' },
+    { titulo: 'Curiosidade do segmento', material: 'foto de apoio ao tema (pode ser de estúdio, sem precisar do cliente)', arte: 'CURIOSIDADE' },
+    { titulo: 'Pergunta pro público responder nos comentários', material: 'foto que ilustre a pergunta, engajamento direto', arte: '[PERGUNTA DIRETA PRO PÚBLICO]' },
+    { titulo: 'Numeros e resultados que o negócio já entregou', material: 'foto do ambiente/equipe, dado em destaque na arte', arte: '[NÚMERO] [RESULTADO ENTREGUE]' },
+    { titulo: 'Passo a passo de como funciona o serviço', material: 'foto do processo ou etapa específica do serviço', arte: 'COMO FUNCIONA' },
+    { titulo: 'Novidade ou lançamento', material: 'foto real do que é novo — produto, serviço ou espaço', arte: 'CHEGOU NOVIDADE' },
+    { titulo: 'Convite pra visitar ou agendar', material: 'foto convidativa do ambiente/fachada/equipe pronta pra atender', arte: 'TE ESPERAMOS' },
   ],
   video: [
     { titulo: 'Bastidores gravados no local', gancho: 'Abre mostrando algo inesperado do dia a dia do negócio', conteudo: 'Mostra o processo/trabalho acontecendo de verdade, sem roteiro engessado', cta: 'Convite pra visitar, marcar horário ou mandar mensagem', arte: 'BASTIDORES' },
@@ -86,27 +96,39 @@ const ANGLES = {
     { titulo: 'Resposta a uma dúvida frequente', gancho: 'Repete a pergunta que os clientes mais fazem', conteudo: 'Resposta direta, sem enrolação, com exemplo real', cta: 'Convite pra mandar outras dúvidas nos comentários', arte: 'RESPONDENDO SUA DÚVIDA' },
     { titulo: 'Tendência adaptada ao segmento', gancho: 'Usa o formato/áudio em alta do momento', conteudo: 'Adapta a tendência pro contexto do negócio, sem forçar', cta: 'CTA leve, foco em engajamento (comentar, compartilhar)', arte: '' },
     { titulo: 'Tour ou demonstração', gancho: 'Abre já mostrando o espaço ou o produto em uso', conteudo: 'Percorre os pontos fortes do local/produto', cta: 'Convite direto pra visitar ou comprar', arte: 'VEM CONHECER' },
+    { titulo: 'Dia a dia da equipe', gancho: 'Mostra a equipe trabalhando, sem cenário montado', conteudo: 'Passa confiança mostrando quem está por trás do negócio', cta: 'Reforça o convite pra conhecer quem vai atender', arte: 'QUEM FAZ ACONTECER' },
+    { titulo: 'Reação a uma pergunta ou comentário real', gancho: 'Lê um comentário/pergunta real de cliente na tela', conteudo: 'Responde de forma direta, olhando pra câmera', cta: 'Convite pra deixar a próxima pergunta nos comentários', arte: '' },
+    { titulo: 'Um dia de trabalho resumido', gancho: 'Corte rápido mostrando o início do expediente', conteudo: 'Sequência de momentos do dia, ritmo ágil', cta: 'Convite pra acompanhar mais nos stories', arte: 'UM DIA NA [NOME DO NEGÓCIO]' },
+    { titulo: 'Explicando um erro comum do segmento', gancho: 'Alerta direto: "isso pode estar te prejudicando"', conteudo: 'Explica o erro e como o negócio resolve isso', cta: 'Convite pra chamar no direct/WhatsApp', arte: 'CUIDADO COM ISSO' },
+    { titulo: 'Resultado real de cliente contado em vídeo', gancho: 'Mostra o resultado final logo de cara', conteudo: 'Conta rapidamente como chegou lá', cta: 'Convite pra quem quer o mesmo resultado', arte: 'RESULTADO REAL' },
+    { titulo: 'Bastidores de uma entrega/atendimento', gancho: 'Abre no meio da ação, sem introdução longa', conteudo: 'Acompanha a entrega/atendimento até o fim', cta: 'Convite pra agendar o próprio atendimento', arte: '' },
   ],
 } as const;
 
-function anglePool(type: string) {
-  return isVideoType(type) ? ANGLES.video : ANGLES.foto;
+type AnguloFoto = (typeof ANGLES.foto)[number];
+type AnguloVideo = (typeof ANGLES.video)[number];
+
+/** Tira o próximo ângulo pra esse cliente+formato, sem repetir nenhum antes de passar pelo pool inteiro (memória persistida). */
+function pickAngle(clientId: string, type: string): AnguloFoto | AnguloVideo {
+  const isVideo = isVideoType(type);
+  const pool = isVideo ? ANGLES.video : ANGLES.foto;
+  const idx = useData.getState().nextAngle(clientId, isVideo ? 'video' : 'foto', pool.length);
+  return pool[idx] ?? pool[0];
 }
 
-function localTitle(type: string, index: number, holiday?: string): string {
+function localTitle(type: string, angle: AnguloFoto | AnguloVideo, holiday?: string): string {
   if (holiday) return `${type} comemorativo: ${holiday}`;
-  const angle = anglePool(type)[index % anglePool(type).length];
   return `${type}: ${angle.titulo}`;
 }
 
 /** Instrução concreta do que fazer com o item — formato explícito, nunca vago. */
-function localBrief(type: string, index: number, holiday?: string): string {
+function localBrief(type: string, angle: AnguloFoto | AnguloVideo, holiday?: string): string {
   if (isVideoType(type)) {
-    const a = ANGLES.video[index % ANGLES.video.length];
+    const a = angle as AnguloVideo;
     const tema = holiday ? `Vídeo sobre ${holiday}.` : '';
     return `Formato: vídeo. ${tema} Roteiro — Gancho: ${a.gancho}. Conteúdo: ${a.conteudo}. CTA: ${a.cta}.`;
   }
-  const a = ANGLES.foto[index % ANGLES.foto.length];
+  const a = angle as AnguloFoto;
   const tema = holiday ? `Arte sobre ${holiday}.` : '';
   return `Formato: foto/arte estática. ${tema} Material necessário: ${a.material}.`;
 }
@@ -116,10 +138,37 @@ function localBrief(type: string, index: number, holiday?: string): string {
  * da legenda (que vai no texto do post). Data comemorativa sempre tem
  * prioridade sobre o ângulo, porque é o que o público espera ver na peça.
  */
-function localArte(type: string, index: number, holiday?: string): string {
+function localArte(angle: AnguloFoto | AnguloVideo, holiday?: string): string {
   if (holiday) return holiday.toUpperCase();
-  const a = anglePool(type)[index % anglePool(type).length];
-  return a.arte;
+  return angle.arte;
+}
+
+const CTAS_LOCAIS = [
+  'Comenta aqui embaixo que a gente te ajuda.',
+  'Chama no direct e vamos conversar.',
+  'Manda mensagem que a gente te explica tudo.',
+  'Salva esse post pra não esquecer.',
+  'Compartilha com quem precisa ver isso.',
+];
+
+/**
+ * Legenda local (sem IA) — nunca genérica a ponto de servir pra qualquer
+ * negócio: sempre nomeia o cliente e o ângulo específico do post. Não
+ * substitui uma IA de verdade (não tem como "pesquisar" o cliente sozinha),
+ * mas também não solta frase solta tipo "Você sabia?" sem contexto nenhum.
+ */
+function localCaption(type: string, angle: AnguloFoto | AnguloVideo, client: Client, holiday?: string): string {
+  const seed = angle.titulo.length + client.name.length;
+  const cta = CTAS_LOCAIS[seed % CTAS_LOCAIS.length];
+  if (holiday) {
+    return `Hoje é ${holiday}! A equipe da ${client.name} passa por aqui pra lembrar desse dia com você. ${cta}`;
+  }
+  if (isVideoType(type)) {
+    const a = angle as AnguloVideo;
+    return `[Roteiro completo]\n\nGANCHO: ${a.gancho}, falando da ${client.name}.\nCONTEÚDO: ${a.conteudo}\nCTA: ${a.cta}`;
+  }
+  const a = angle as AnguloFoto;
+  return `${a.titulo} — direto aqui da ${client.name}.\n\n${client.briefing ? client.briefing.split('.')[0] + '.' : ''} ${cta}`.trim();
 }
 
 /** Monta os slots do mês a partir da cadência semanal + datas comemorativas. */
@@ -139,18 +188,24 @@ export function buildClientSlots(client: Client, year: number, month: number): P
     (h) => Number(h.md.slice(0, 2)) === month + 1,
   );
   const items: PlanItem[] = [];
-  let idx = 0;
+
+  function montarItem(date: string, type: string, holiday?: string): PlanItem {
+    const angle = pickAngle(client.id, type);
+    return {
+      date, type, title: localTitle(type, angle, holiday), holiday,
+      isVideo: isVideoType(type),
+      brief: localBrief(type, angle, holiday),
+      arte: localArte(angle, holiday),
+      caption: localCaption(type, angle, client, holiday),
+    };
+  }
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dow = new Date(year, month, d).getDay();
     const types = client.weeklyPlan?.[dow] ?? [];
     const hol = monthHolidays.find((h) => Number(h.md.slice(3)) === d);
     for (const type of types) {
-      const i = idx++;
-      items.push({
-        date: iso(year, month, d), type, title: localTitle(type, i, hol?.name), holiday: hol?.name,
-        isVideo: isVideoType(type), brief: localBrief(type, i, hol?.name), arte: localArte(type, i, hol?.name),
-      });
+      items.push(montarItem(iso(year, month, d), type, hol?.name));
     }
   }
 
@@ -160,11 +215,7 @@ export function buildClientSlots(client: Client, year: number, month: number): P
   for (const h of monthHolidays.filter((x) => x.universal || proprioNoMes.has(x.md))) {
     const date = iso(year, month, Number(h.md.slice(3)));
     if (!items.some((i) => i.date === date && i.holiday === h.name)) {
-      const i = idx++;
-      items.push({
-        date, type: 'Post', title: localTitle('Post', i, h.name), holiday: h.name,
-        isVideo: false, brief: localBrief('Post', i, h.name), arte: localArte('Post', i, h.name),
-      });
+      items.push(montarItem(date, 'Post', h.name));
     }
   }
 
@@ -192,11 +243,6 @@ export interface ApplyResult {
   videos: number;
 }
 
-/**
- * Envia o plano para produção: cria os posts no pipeline e os projetos de
- * vídeo. Itens já existentes (mesmo título e data) são pulados, então gerar
- * de novo não duplica.
- */
 function notasCompletas(item: PlanItem): string {
   let notas = item.brief;
   if (item.arte) notas += `\n\nTexto da arte: ${item.arte}`;
@@ -204,46 +250,65 @@ function notasCompletas(item: PlanItem): string {
   return notas;
 }
 
+/**
+ * Envia o plano para produção: cria os posts no pipeline (formatos de
+ * foto/arte) e os projetos de vídeo (formatos de vídeo) — cada item vira
+ * UMA coisa só, nunca as duas, pra não duplicar "Vídeo: X" tanto em Posts
+ * quanto em Vídeos. Itens já existentes (mesmo título e data) são pulados,
+ * então gerar de novo não duplica.
+ */
 export function applyPlanToWorkspace(client: Client, items: PlanItem[]): ApplyResult {
   const store = useData.getState();
   let posts = 0, videos = 0;
 
+  // Verifica por cliente+data (contando quantos já existem naquele dia), não
+  // por título: com a memória de ângulos o título muda a cada geração, então
+  // checar só o título deixaria duplicar ao gerar de novo o mesmo mês. Conta
+  // por dia (não só "existe algum") pra não quebrar dias com mais de um
+  // formato agendado (ex.: Post e Reels no mesmo dia).
+  const jaExistePost = new Map<string, number>();
+  const jaExisteVideo = new Map<string, number>();
+  for (const p of store.posts) if (p.clientId === client.id && p.scheduledDate) jaExistePost.set(p.scheduledDate, (jaExistePost.get(p.scheduledDate) ?? 0) + 1);
+  for (const v of store.videos) if (v.clientId === client.id && v.dueDate) jaExisteVideo.set(v.dueDate, (jaExisteVideo.get(v.dueDate) ?? 0) + 1);
+  const vistoPost = new Map<string, number>();
+  const vistoVideo = new Map<string, number>();
+
   for (const item of items) {
     const due = dueDateFor(item.date);
-    const isVideo = item.isVideo;
 
-    const postExists = store.posts.some(
-      (p) => p.clientId === client.id && p.scheduledDate === item.date && p.title === item.title,
-    );
-    if (!postExists) {
-      store.addPost({
-        title: item.title,
-        platform: platformFor(item.type),
-        clientId: client.id,
-        stage: 'ideia',
-        scheduledDate: item.date,
-        // Sem material de vídeo em mãos, o post já nasce marcado — a lista
-        // mostra o selo "falta material" sem precisar abrir o card.
-        awaitingMaterial: isVideo,
-        notes: notasCompletas(item),
-      });
-      posts++;
+    if (item.isVideo) {
+      const ja = jaExisteVideo.get(due) ?? 0;
+      const visto = vistoVideo.get(due) ?? 0;
+      vistoVideo.set(due, visto + 1);
+      if (visto < ja) continue; // esse "slot" do dia já tinha vídeo — não duplica
+      store.addVideo({ title: item.title, clientId: client.id, dueDate: due, notes: `${notasCompletas(item)}\n\n${item.caption}` });
+      videos++;
+      continue;
     }
 
-    if (isVideo) {
-      const vidExists = store.videos.some((v) => v.clientId === client.id && v.title === item.title && v.dueDate === due);
-      if (!vidExists) {
-        store.addVideo({ title: item.title, clientId: client.id, dueDate: due, notes: notasCompletas(item) });
-        videos++;
-      }
-    }
+    const ja = jaExistePost.get(item.date) ?? 0;
+    const visto = vistoPost.get(item.date) ?? 0;
+    vistoPost.set(item.date, visto + 1);
+    if (visto < ja) continue; // esse "slot" do dia já tinha post — não duplica
+    store.addPost({
+      title: item.title,
+      platform: platformFor(item.type),
+      clientId: client.id,
+      stage: 'ideia',
+      scheduledDate: item.date,
+      notes: notasCompletas(item),
+      // A copy já sai pronta do planejamento — não precisa esperar chegar
+      // em Aprovação pra ter texto nenhum.
+      copy: item.caption,
+    });
+    posts++;
   }
 
   store.addEvent({
     channel: 'sistema',
     title: `Planejamento de ${client.name} enviado para produção`,
     status: 'ok',
-    detail: `${posts} posts e ${videos} vídeos criados com prazos.`,
+    detail: `${posts} posts e ${videos} vídeos criados com prazos e copy prontos.`,
   });
 
   return { posts, videos };

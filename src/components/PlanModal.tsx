@@ -11,6 +11,16 @@ import type { Client } from '@/lib/types';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
+/** Últimos temas já usados pra esse cliente (posts + vídeos), pra IA não repetir ângulo. */
+function recentTitlesFor(clientId: string): string[] {
+  const { posts, videos } = useData.getState();
+  const doCliente = [
+    ...posts.filter((p) => p.clientId === clientId).map((p) => ({ t: p.title, d: p.scheduledDate ?? '' })),
+    ...videos.filter((v) => v.clientId === clientId).map((v) => ({ t: v.title, d: v.dueDate ?? '' })),
+  ];
+  return doCliente.sort((a, b) => b.d.localeCompare(a.d)).slice(0, 15).map((x) => x.t);
+}
+
 export function PlanModal({ client, onClose }: { client: Client; onClose: () => void }) {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() + 1, 1); // próximo mês
@@ -28,7 +38,7 @@ export function PlanModal({ client, onClose }: { client: Client; onClose: () => 
       title: item.title.replace(/^[^:]+:\s*/, ''),
       platform: item.isVideo ? undefined : 'Instagram',
       category: item.type,
-      caption: item.brief,
+      caption: item.caption || item.brief,
       arte: item.arte || undefined,
       isVideo: item.isVideo,
       guardado: true,
@@ -40,9 +50,10 @@ export function PlanModal({ client, onClose }: { client: Client; onClose: () => 
     let alive = true;
     setLoading(true);
     const slots = buildClientSlots(client, ym.y, ym.m);
-    generatePlanIdeas(client, slots).then((titles) => {
+    const recentTitles = recentTitlesFor(client.id);
+    generatePlanIdeas(client, slots.map((s) => ({ ...s, recentTitles }))).then((ideas) => {
       if (!alive) return;
-      setItems(slots.map((s, i) => ({ ...s, title: titles[i] ?? s.title })));
+      setItems(ideas ? slots.map((s, i) => ({ ...s, title: ideas[i]?.title ?? s.title, caption: ideas[i]?.caption ?? s.caption })) : slots);
       setLoading(false);
     });
     return () => { alive = false; };

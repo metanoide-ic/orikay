@@ -7,6 +7,7 @@ import type {
   Campaign,
   Card,
   Charge,
+  ChecklistItem,
   Client,
   Column,
   ColumnAutomation,
@@ -32,6 +33,19 @@ interface DataState {
   charges: Charge[];
   campaigns: Campaign[];
   seeded: boolean;
+  /**
+   * Memória de quais ângulos editoriais já foram usados por cliente, pra
+   * planejamento nunca repetir tema antes de passar por todos os outros.
+   * Guarda uma fila embaralhada restante por cliente+formato — quando
+   * esvazia, embaralha de novo (sem repetir o último usado na virada).
+   */
+  angleMemory: Record<string, { foto: number[]; video: number[] }>;
+
+  /** Itens extras do checklist do calendário, adicionados manualmente por dia (chave = data ISO). */
+  checklistExtras: Record<string, ChecklistItem[]>;
+  addChecklistExtra: (date: string, text: string) => void;
+  toggleChecklistExtra: (date: string, id: string) => void;
+  removeChecklistExtra: (date: string, id: string) => void;
 
   loadDemo: () => void;
   /** Repõe clientes da carteira que tenham sido removidos, sem apagar nada. */
@@ -113,12 +127,31 @@ interface DataState {
   upsertCharges: (list: Charge[]) => void;
   updateCharge: (id: string, patch: Partial<Charge>) => void;
   removeCharge: (id: string) => void;
+
+  /**
+   * Tira o próximo índice de ângulo pra esse cliente+formato, sem repetir
+   * nenhum antes de passar pelo pool inteiro. `poolSize` é o tamanho atual
+   * do pool de ângulos (se o código adicionar mais ângulos depois, a fila
+   * antiga é descartada e recomeça do zero automaticamente).
+   */
+  nextAngle: (clientId: string, tipo: 'foto' | 'video', poolSize: number) => number;
 }
 
 const empty = {
   clients: [], boards: [], transactions: [], posts: [],
   videos: [], library: [], events: [], charges: [], campaigns: [],
+  angleMemory: {} as Record<string, { foto: number[]; video: number[] }>,
+  checklistExtras: {} as Record<string, ChecklistItem[]>,
 };
+
+function embaralhar<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 export const useData = create<DataState>()(
   persist(
@@ -465,6 +498,48 @@ export const useData = create<DataState>()(
         set((s) => ({ charges: s.charges.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       removeCharge: (id) =>
         set((s) => ({ charges: s.charges.filter((c) => c.id !== id) })),
+
+      nextAngle: (clientId, tipo, poolSize) => {
+        const atual = get().angleMemory[clientId] ?? { foto: [], video: [] };
+        let fila = atual[tipo];
+        // Fila vazia ou de um pool de tamanho diferente (código mudou a
+        // lista de ângulos) — embaralha uma nova, evitando repetir o
+        // último índice usado bem na virada.
+        if (fila.length === 0 || fila.some((i) => i >= poolSize)) {
+          const ultimo = fila[fila.length - 1];
+          let nova = embaralhar([...Array(poolSize).keys()]);
+          if (nova[0] === ultimo && nova.length > 1) [nova[0], nova[1]] = [nova[1], nova[0]];
+          fila = nova;
+        }
+        const idx = fila[0];
+        const resto = fila.slice(1);
+        set((s) => ({
+          angleMemory: { ...s.angleMemory, [clientId]: { ...atual, [tipo]: resto } },
+        }));
+        return idx;
+      },
+
+      addChecklistExtra: (date, text) =>
+        set((s) => ({
+          checklistExtras: {
+            ...s.checklistExtras,
+            [date]: [...(s.checklistExtras[date] ?? []), { id: uid('ckx'), text, done: false }],
+          },
+        })),
+      toggleChecklistExtra: (date, id) =>
+        set((s) => ({
+          checklistExtras: {
+            ...s.checklistExtras,
+            [date]: (s.checklistExtras[date] ?? []).map((i) => (i.id === id ? { ...i, done: !i.done } : i)),
+          },
+        })),
+      removeChecklistExtra: (date, id) =>
+        set((s) => ({
+          checklistExtras: {
+            ...s.checklistExtras,
+            [date]: (s.checklistExtras[date] ?? []).filter((i) => i.id !== id),
+          },
+        })),
     }),
     { name: 'origem.data' },
   ),

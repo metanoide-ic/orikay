@@ -70,9 +70,9 @@ export default function Clients() {
     for (const c of comCadencia) {
       const slots = buildClientSlots(c, year, month);
       if (slots.length === 0) continue;
-      // Com IA externa ligada, os temas saem do briefing; sem ela, do template.
-      const titles = await generatePlanIdeas(c, slots);
-      const itens = slots.map((slot, i) => ({ ...slot, title: titles[i] ?? slot.title }));
+      // Com IA externa ligada, tema e copy saem do briefing; sem ela, do template local.
+      const ideas = await generatePlanIdeas(c, slots);
+      const itens = ideas ? slots.map((slot, i) => ({ ...slot, title: ideas[i]?.title ?? slot.title, caption: ideas[i]?.caption ?? slot.caption })) : slots;
       const r = applyPlanToWorkspace(c, itens);
       posts += r.posts; videos += r.videos; feitos++;
     }

@@ -58,52 +58,69 @@ function buildPrompt(post: Post, client?: Client, brandVoice?: string): string {
   );
 }
 
+export interface PlanIdea {
+  title: string;
+  caption: string;
+}
+
 /**
- * Melhora os temas do planejamento mensal com a IA configurada.
- * Recebe os slots (data + formato) e devolve um tema por slot, no mesmo
- * tamanho e ordem. Sem IA configurada (ou em erro), mantém os temas locais.
+ * Melhora o planejamento mensal com a IA configurada: gera tema E copy/roteiro
+ * completo por slot, com base real no briefing do cliente — sem IA configurada
+ * (ou em erro), devolve null e quem chamou usa o conteúdo local (template) já
+ * pronto no próprio slot.
  */
 export async function generatePlanIdeas(
   client: Client,
-  slots: Array<{ date: string; type: string; holiday?: string; title: string }>,
-): Promise<string[]> {
+  slots: Array<{ date: string; type: string; holiday?: string; title: string; caption?: string; recentTitles?: string[] }>,
+): Promise<PlanIdea[] | null> {
   const s = useSettings.getState();
-  const fallback = slots.map((x) => x.title);
-  if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) return fallback;
+  if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) return null;
   try {
     const listado = slots
       .map((x, i) => `${i + 1}. ${x.date} — formato: ${x.type}${x.holiday ? ` — data comemorativa: ${x.holiday}` : ''}`)
       .join('\n');
+    const evitar = slots
+      .flatMap((x) => x.recentTitles ?? [])
+      .filter((t, i, arr) => t && arr.indexOf(t) === i)
+      .slice(0, 20);
     const prompt =
-      `Você planeja conteúdo de redes sociais para o cliente "${client.name}" da agência Origem.\n` +
-      (client.briefing ? `Sobre o cliente: ${client.briefing}\n` : '') +
+      `Você é redator e estrategista de conteúdo da agência Origem, planejando o mês do cliente "${client.name}".\n` +
+      (client.briefing ? `Sobre o cliente (use só o que está aqui, não invente fatos novos sobre o negócio): ${client.briefing}\n` : '') +
       (client.cities?.length ? `Cidades onde atende: ${client.cities.join(', ')}.\n` : '') +
-      `Crie um tema curto e específico (até 12 palavras, sem emojis, sem aspas) para cada item:\n${listado}\n` +
-      `Responda somente com uma lista numerada, um tema por linha, na mesma ordem.`;
+      (evitar.length ? `Já foram usados esses temas recentemente, NÃO repita o mesmo ângulo: ${evitar.join(' | ')}\n` : '') +
+      `Regras importantes:\n` +
+      `- Cada item tem que ter a ver de verdade com esse cliente específico, nada de tema genérico tipo "Você sabia?" sem ligação com o negócio.\n` +
+      `- Não invente números, prêmios, depoimentos ou fatos que não estejam no briefing. Se faltar informação, escreva algo genérico mas honesto (sem fingir dado concreto).\n` +
+      `- Para formato de vídeo, "legenda" é o ROTEIRO completo (gancho, conteúdo, CTA). Para foto/post, é a legenda pronta pra publicar.\n` +
+      `- Sem emojis. Português do Brasil. CTA claro no fim.\n\n` +
+      `Itens do mês:\n${listado}\n\n` +
+      `Responda SOMENTE com um JSON array (sem markdown, sem texto fora do array), na mesma ordem e quantidade dos itens, cada elemento assim: {"titulo": "...", "legenda": "..."}`;
     const res = await fetch(s.aiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.aiKey}` },
       body: JSON.stringify({
         model: s.aiModel,
         messages: [
-          { role: 'system', content: 'Você é um estrategista de conteúdo sênior. Seja específico e direto.' },
+          { role: 'system', content: 'Você é um estrategista e redator de conteúdo sênior. Responde só com JSON válido quando pedido.' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.7,
-        max_tokens: 1200,
+        max_tokens: 4000,
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const text: string = data?.choices?.[0]?.message?.content ?? '';
-    const lines = text
-      .split('\n')
-      .map((l: string) => l.replace(/^\s*\d+[.)-]\s*/, '').trim())
-      .filter(Boolean);
-    if (lines.length < slots.length) throw new Error('resposta incompleta');
-    return slots.map((x, i) => `${x.type}: ${lines[i]}`);
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('resposta sem JSON');
+    const parsed = JSON.parse(jsonMatch[0]) as Array<{ titulo?: string; legenda?: string }>;
+    if (parsed.length < slots.length) throw new Error('resposta incompleta');
+    return slots.map((x, i) => ({
+      title: parsed[i]?.titulo?.trim() ? `${x.type}: ${parsed[i].titulo!.trim()}` : x.title,
+      caption: parsed[i]?.legenda?.trim() || x.caption || '',
+    }));
   } catch {
-    return fallback;
+    return null;
   }
 }
 
