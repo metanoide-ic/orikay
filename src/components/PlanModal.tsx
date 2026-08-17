@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, FileText, Loader2, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Loader2, Send, Bookmark, BookmarkCheck } from 'lucide-react';
 import { Modal, Button, Input } from './ui';
 import { buildClientSlots, applyPlanToWorkspace, type PlanItem } from '@/lib/planner';
 import { generatePlanIdeas } from '@/lib/ai';
 import { openPlanPdf } from '@/lib/planPdf';
+import { useData } from '@/lib/dataStore';
 import { cn } from '@/lib/utils';
 import type { Client } from '@/lib/types';
 
@@ -17,7 +18,23 @@ export function PlanModal({ client, onClose }: { client: Client; onClose: () => 
   const [items, setItems] = useState<PlanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sentMsg, setSentMsg] = useState('');
+  const [guardados, setGuardados] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
+  const addLibraryItem = useData((s) => s.addLibraryItem);
+
+  /** Guarda o item na Biblioteca → Guardados, pra restaurar e usar depois. */
+  function guardar(item: PlanItem, i: number) {
+    addLibraryItem({
+      title: item.title.replace(/^[^:]+:\s*/, ''),
+      platform: item.isVideo ? undefined : 'Instagram',
+      category: item.type,
+      caption: item.brief,
+      arte: item.arte || undefined,
+      isVideo: item.isVideo,
+      guardado: true,
+    });
+    setGuardados((prev) => new Set(prev).add(i));
+  }
 
   useEffect(() => {
     let alive = true;
@@ -87,8 +104,17 @@ export function PlanModal({ client, onClose }: { client: Client; onClose: () => 
                       className="h-9 w-full"
                     />
                     <p className="text-[11px] leading-snug text-white/40">{item.brief}</p>
+                    {item.arte && <p className="text-[11px] leading-snug text-amber-300/80">Texto da arte: {item.arte}</p>}
                   </div>
                   {item.holiday && <span className="mt-1.5 shrink-0 rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">{item.holiday}</span>}
+                  <button
+                    onClick={() => guardar(item, i)}
+                    disabled={guardados.has(i)}
+                    title={guardados.has(i) ? 'Guardado' : 'Guardar na Biblioteca'}
+                    className={cn('mt-1 shrink-0 rounded-lg p-1.5 transition', guardados.has(i) ? 'text-emerald-400' : 'text-white/30 hover:bg-white/5 hover:text-white')}
+                  >
+                    {guardados.has(i) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                  </button>
                 </div>
               );
             })}

@@ -251,6 +251,17 @@ export interface LibraryItem {
   hashtags?: string;
   mediaUrl?: string;
   createdAt: number;
+  /** Texto pra escrever na arte — o que vai na peça, diferente da legenda. */
+  arte?: string;
+  /** true quando o formato é vídeo (o "caption" vira o roteiro, não legenda de post). */
+  isVideo?: boolean;
+  /**
+   * true quando veio do botão "Guardar" do planejamento — aparece na aba
+   * Guardados em vez de Modelos. Modelo é feito à mão pra reutilizar
+   * sempre; guardado é um item específico do planejamento que se quis
+   * salvar pra usar depois.
+   */
+  guardado?: boolean;
 }
 
 // -------------------------- Automações --------------------------------

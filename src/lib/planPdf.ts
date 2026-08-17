@@ -22,7 +22,7 @@ export function openPlanPdf(client: Client, items: PlanItem[], year: number, mon
       return `<tr>
         <td class="data"><b>${String(d.getDate()).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}</b><span>${DIAS[d.getDay()]}</span></td>
         <td class="formato">${esc(i.type)}</td>
-        <td class="tema">${esc(i.title.replace(/^[^:]+:\s*/, ''))}<small>${esc(i.brief)}</small>${i.holiday ? `<em>${esc(i.holiday)}</em>` : ''}</td>
+        <td class="tema">${esc(i.title.replace(/^[^:]+:\s*/, ''))}<small>${esc(i.brief)}</small>${i.arte ? `<small class="arte">Texto da arte: ${esc(i.arte)}</small>` : ''}${i.holiday ? `<em>${esc(i.holiday)}</em>` : ''}</td>
       </tr>`;
     })
     .join('');
@@ -55,6 +55,7 @@ export function openPlanPdf(client: Client, items: PlanItem[], year: number, mon
   td.formato { width: 92px; font-weight: 600; color: #5836c4; }
   td.tema em { display: block; font-style: normal; font-size: 10.5px; color: #b0812a; margin-top: 2px; }
   td.tema small { display: block; font-size: 10px; color: #6b6b7d; margin-top: 2px; line-height: 1.4; }
+  td.tema small.arte { color: #b0812a; font-weight: 600; }
   footer { margin-top: 26px; padding-top: 12px; border-top: 1px solid #e4e4ee; display: flex; justify-content: space-between; font-size: 10px; color: #8a8a99; letter-spacing: 1px; }
 </style></head><body>
 <header>
