@@ -507,6 +507,22 @@ const aguardando = new Map(); // grupo -> [{ postId, titulo, cliente, quando }]
  */
 let decisoes = [];
 
+/**
+ * Última cobrança enviada a cada número, pra poder responder sozinho
+ * perguntas do tipo "qual o valor", "até quando" ou "qual o pix" sem
+ * precisar perguntar nada pra plataforma. Fica só na memória (não é
+ * segredo, e se o conector reiniciar a próxima cobrança repõe de novo).
+ */
+const cobrancasAtivas = new Map(); // dígitos do número -> { cliente, valor, vencimento, metodo, chavePix, link, quando }
+
+function soDigitos(s) {
+  return String(s || '').replace(/\D/g, '');
+}
+
+function formatarMoeda(v) {
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 function normalizar(texto) {
   return String(texto || '')
     .toLowerCase()
@@ -528,6 +544,44 @@ function interpretar(texto) {
   if (PEDE_ALTERACAO.test(t) || NAO_GOSTOU.test(t)) return 'alteracao';
   if (APROVA.test(t)) return 'aprovado';
   return null; // conversa comum do grupo: não mexe em nada
+}
+
+/* --------------------- Atendimento automático (cobrança) --------------- */
+
+const PERGUNTA_PIX = /\bpix\b/;
+const PERGUNTA_VALOR = /\b(quanto|valor|preco)\b/;
+const PERGUNTA_VENCIMENTO = /\b(quando|vencimento|vence|venci|prazo|ate quando)\b/;
+const PERGUNTA_COBRANCA_GERAL = /\b(cobranca|boleto|fatura|pagamento|nota fiscal|debito)\b/;
+
+/** Reconhece se a mensagem está perguntando algo sobre a cobrança. Sem IA — só palavra-chave, pra nunca inventar resposta sobre dinheiro. */
+function perguntaSobreCobranca(texto) {
+  const t = normalizar(texto);
+  if (!t.trim()) return null;
+  if (PERGUNTA_PIX.test(t)) return 'pix';
+  if (PERGUNTA_VALOR.test(t)) return 'valor';
+  if (PERGUNTA_VENCIMENTO.test(t)) return 'vencimento';
+  if (PERGUNTA_COBRANCA_GERAL.test(t)) return 'geral';
+  return null;
+}
+
+/** Monta a resposta a partir dos dados reais da última cobrança enviada a esse número — nunca inventa valor nem data. */
+function responderCobranca(numero, pergunta) {
+  const c = cobrancasAtivas.get(soDigitos(numero));
+  if (!c) return null;
+  const venc = new Date(c.vencimento + 'T00:00').toLocaleDateString('pt-BR');
+
+  if (pergunta === 'pix') {
+    return c.chavePix
+      ? `Nossa chave Pix é: ${c.chavePix}`
+      : `Essa cobrança está sendo feita por ${c.metodo === 'boleto' ? 'boleto' : 'nota fiscal'}, não por Pix. Qualquer dúvida é só chamar.`;
+  }
+  if (pergunta === 'valor') return `O valor da cobrança é ${formatarMoeda(c.valor)}.`;
+  if (pergunta === 'vencimento') return `O vencimento é ${venc}.`;
+
+  let msg = `Sobre a sua cobrança: valor ${formatarMoeda(c.valor)}, vencimento ${venc}.`;
+  if (c.chavePix) msg += ` Chave Pix: ${c.chavePix}`;
+  if (c.link) msg += ` Link: ${c.link}`;
+  return msg;
 }
 
 /** Tira do payload do provedor o grupo, o texto e se a mensagem é nossa. */
@@ -554,9 +608,30 @@ function lerMensagem(corpo) {
   return null;
 }
 
-function receberMensagem(corpo) {
+async function receberMensagem(corpo) {
   const msg = lerMensagem(corpo);
   if (!msg || msg.minha) return null;
+
+  // Pergunta sobre cobrança (valor, vencimento, Pix): responde sozinho na
+  // hora, sem precisar de fila nem de post esperando aprovação. Só entra
+  // aqui se esse número tiver uma cobrança ativa de verdade — nunca inventa
+  // valor pra quem nunca foi cobrado.
+  const alvoCobranca = soDigitos(msg.grupo);
+  if (cobrancasAtivas.has(alvoCobranca)) {
+    const pergunta = perguntaSobreCobranca(msg.texto);
+    if (pergunta) {
+      const resposta = responderCobranca(msg.grupo, pergunta);
+      if (resposta) {
+        try {
+          await enviarWhatsapp(msg.grupo, resposta);
+          registrar('cobranca', `respondeu pergunta de cobrança (${pergunta}) automaticamente`);
+        } catch (e) {
+          registrar('cobranca', `falha ao responder pergunta de cobrança: ${e.message}`, false);
+        }
+        return null; // atendimento automático, não é decisão de post
+      }
+    }
+  }
 
   const fila = aguardando.get(msg.grupo) || [];
   if (fila.length === 0) return null; // nada esperando resposta nesse grupo
@@ -763,8 +838,23 @@ async function processar(evento) {
     if (emissao?.link) mensagem += `\n\nPague por aqui: ${emissao.link}`;
     if (emissao?.pix) mensagem += `\n\nPix copia e cola:\n${emissao.pix}`;
 
+    // Guarda os dados desta cobrança pra poder responder sozinho se o
+    // cliente perguntar o valor, o vencimento ou o Pix depois — grava antes
+    // de mandar, porque o atendimento automático tem que valer mesmo que o
+    // envio inicial falhe e a cobrança seja reenviada de outro jeito.
+    cobrancasAtivas.set(soDigitos(evento.numero), {
+      cliente: evento.cliente,
+      valor: evento.valor,
+      vencimento: evento.vencimento,
+      metodo: evento.metodo,
+      chavePix: emissao?.pix || evento.chavePix || null,
+      link: emissao?.link || null,
+      quando: Date.now(),
+    });
+
     await enviarWhatsapp(evento.numero, mensagem);
     registrar('cobranca', `cobrança de ${evento.cliente} enviada (${evento.metodo})`);
+
     return emissao ? { gatewayId: emissao.gatewayId, gatewayUrl: emissao.link } : undefined;
   }
 
@@ -850,7 +940,7 @@ const servidor = createServer(async (req, res) => {
     }
     let decisao = null;
     try {
-      decisao = receberMensagem(await corpo(req));
+      decisao = await receberMensagem(await corpo(req));
     } catch (e) {
       registrar('resposta', e.message, false);
     }

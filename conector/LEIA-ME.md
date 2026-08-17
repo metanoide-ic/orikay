@@ -123,6 +123,19 @@ consegue emitir, e a plataforma envia a mensagem simples avisando no log.
 Nota fiscal continua como antes: o pedido vai para o contador no WhatsApp, e a
 baixa é manual.
 
+### Atendimento automático de cobrança
+Depois que uma cobrança é enviada a um cliente, o conector guarda o valor, o
+vencimento e a chave Pix daquela cobrança. Se o cliente responder no
+WhatsApp perguntando "qual o valor?", "até quando é pra pagar?" ou "qual o
+pix?", o conector já responde sozinho, na hora, sem precisar abrir a
+plataforma.
+
+Só responde quando reconhece a pergunta por palavra-chave (pix, valor,
+vencimento, cobrança) **e** existe uma cobrança de verdade enviada àquele
+número — nunca inventa valor pra quem nunca foi cobrado. Isso é atendimento,
+não decide nada sozinho: uma pergunta fora desse assunto (ex.: sobre o post)
+segue normalmente para a aprovação de posts, sem se misturar.
+
 ## Perguntas comuns
 
 **Preciso deixar aberto?** Sim, enquanto quiser que as ações saiam
