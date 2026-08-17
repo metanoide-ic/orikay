@@ -1,0 +1,117 @@
+{
+    "name": "Origem - Aprovacao no WhatsApp",
+    "flow": [
+        {
+            "id": 1,
+            "module": "gateway:CustomWebHook",
+            "version": 1,
+            "parameters": {
+                "hook": 0,
+                "maxResults": 1
+            },
+            "mapper": {},
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "hook": {
+                            "label": "Webhook da Plataforma Origem"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "hook",
+                        "type": "hook:gateway-webhook",
+                        "label": "Webhook",
+                        "required": true
+                    }
+                ],
+                "interface": [
+                    { "name": "tipo", "type": "text" },
+                    { "name": "grupo", "type": "text" },
+                    { "name": "postId", "type": "text" },
+                    { "name": "titulo", "type": "text" },
+                    { "name": "plataforma", "type": "text" },
+                    { "name": "cliente", "type": "text" },
+                    { "name": "mensagem", "type": "text" },
+                    { "name": "copy", "type": "text" },
+                    { "name": "mediaUrl", "type": "text" }
+                ]
+            }
+        },
+        {
+            "id": 2,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "url": "https://api.z-api.io/instances/SUA_INSTANCIA/token/SEU_TOKEN/send-text",
+                "method": "post",
+                "headers": [
+                    {
+                        "name": "Client-Token",
+                        "value": "SEU_CLIENT_TOKEN"
+                    }
+                ],
+                "qs": [],
+                "bodyType": "raw",
+                "contentType": "application/json",
+                "data": "{\"phone\": \"{{1.grupo}}\", \"message\": \"{{1.mensagem}}\"}",
+                "gzip": true,
+                "useMtls": false,
+                "authPass": "",
+                "authUser": "",
+                "timeout": "",
+                "shareCookies": false,
+                "parseResponse": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "followAllRedirects": false,
+                "rejectUnauthorized": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0
+                },
+                "restore": {},
+                "expect": [
+                    { "name": "url", "type": "url", "label": "URL", "required": true },
+                    { "name": "method", "type": "select", "label": "Method", "required": true },
+                    { "name": "headers", "type": "array", "label": "Headers" },
+                    { "name": "qs", "type": "array", "label": "Query String" },
+                    { "name": "bodyType", "type": "select", "label": "Body type" },
+                    { "name": "parseResponse", "type": "boolean", "label": "Parse response", "required": true }
+                ]
+            }
+        }
+    ],
+    "metadata": {
+        "instant": true,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us1.make.com",
+        "notes": []
+    }
+}

@@ -1,0 +1,62 @@
+name: Instaladores do app desktop
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/instaladores.yml'
+      - 'electron/**'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            files: release/*.exe
+          - os: macos-latest
+            files: release/*.dmg
+          - os: ubuntu-latest
+            files: release/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build do app
+        run: npm run build:desktop
+
+      - name: Gerar instalador
+        run: npx electron-builder --publish never
+
+      - name: Publicar na página de Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: instaladores-v1
+          name: 'Orikay — Instaladores'
+          body: |
+            Instaladores do aplicativo desktop da Orikay.
+
+            - Windows: Orikay-1.0.0.exe
+            - macOS: Orikay-1.0.0.dmg
+            - Linux: Orikay-1.0.0.AppImage
+
+            Os instaladores não são assinados digitalmente; na primeira execução
+            o sistema pode pedir confirmação (Windows: "Mais informações →
+            Executar assim mesmo"; macOS: clique direito → Abrir).
+          files: ${{ matrix.files }}

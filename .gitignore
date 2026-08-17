@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+dev-dist
+
+*.tsbuildinfo
+dist-demo
+dist-desktop
+release
