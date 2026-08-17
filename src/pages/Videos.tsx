@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, pointerWithin,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core';
-import { Plus, CheckSquare, MessageSquare, Link2, Clapperboard, Trash2, X } from 'lucide-react';
+import { SortableContext, useSortable, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Plus, CheckSquare, MessageSquare, Link2, Clapperboard, Trash2, X, FolderOpen, Copy, ArrowRightCircle, GripVertical } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Field, Input, Modal, Select } from '@/components/ui';
+import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
+import { useSettings } from '@/lib/settingsStore';
 import { useClientMap } from '@/lib/hooks';
-import { VIDEO_STAGE_META, VIDEO_STAGE_ORDER } from '@/lib/labels';
+import { VIDEO_STAGE_META, VIDEO_STAGE_ORDER, resolveOrder } from '@/lib/labels';
 import { cn, todayISO } from '@/lib/utils';
 import type { VideoProject, VideoStage } from '@/lib/types';
 import { VideoModal } from '@/components/VideoModal';
@@ -29,6 +33,14 @@ export default function Videos() {
   const [lastClicked, setLastClicked] = useState<string | null>(null);
   const [bulkTarget, setBulkTarget] = useState<VideoStage>('briefing');
 
+  // Seleção por arrasto (marquee) e menu de botão direito — igual em Posts.
+  const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; video: VideoProject } | null>(null);
+
+  const savedStageOrder = useSettings((s) => s.videoStageOrder);
+  const setStageOrder = useSettings((s) => s.update);
+  const stageOrder = useMemo(() => resolveOrder(savedStageOrder, VIDEO_STAGE_ORDER), [savedStageOrder]);
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const byStage = useMemo(() => {
     const m: Record<string, VideoProject[]> = {};
@@ -43,14 +55,103 @@ export default function Videos() {
   }, [videos]);
 
   const activeVideo = activeId ? videos.find((v) => v.id === activeId) : null;
+  const activeStage = activeId?.startsWith('col-') ? (activeId.slice(4) as VideoStage) : null;
 
   function onDragEnd(e: DragEndEvent) {
     setActiveId(null);
     const { active, over } = e;
     if (!over) return;
+
+    // Arrastou o cabeçalho da coluna — reordena as colunas.
+    if (String(active.id).startsWith('col-')) {
+      const overRaw = String(over.id);
+      const fromStage = String(active.id).slice(4) as VideoStage;
+      const toStage = (overRaw.startsWith('col-') ? overRaw.slice(4) : overRaw) as VideoStage;
+      const from = stageOrder.indexOf(fromStage);
+      const to = stageOrder.indexOf(toStage);
+      if (from === -1 || to === -1 || from === to) return;
+      setStageOrder({ videoStageOrder: arrayMove(stageOrder, from, to) });
+      return;
+    }
+
     const v = videos.find((x) => x.id === String(active.id));
     const toStage = String(over.id) as VideoStage;
     if (v && VIDEO_STAGE_ORDER.includes(toStage) && v.stage !== toStage) moveVideo(v.id, toStage);
+  }
+
+  /** Clica e arrasta numa área vazia da página pra selecionar vários vídeos de uma vez. */
+  function onBoardMouseDown(e: MouseEvent) {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-video-id], button, textarea, input, select, a')) return;
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+    const x1 = e.clientX, y1 = e.clientY;
+    let x2 = x1, y2 = y1;
+    setMarquee({ x1, y1, x2, y2 });
+
+    const BORDA = 56;
+    let velocidade = 0;
+    let raf = 0;
+    function passoScroll() {
+      if (velocidade !== 0) {
+        window.scrollBy(0, velocidade);
+        y2 += velocidade;
+        setMarquee({ x1, y1, x2, y2 });
+      }
+      raf = requestAnimationFrame(passoScroll);
+    }
+    raf = requestAnimationFrame(passoScroll);
+
+    function onMove(ev: MouseEvent) {
+      x2 = ev.clientX; y2 = ev.clientY;
+      setMarquee({ x1, y1, x2, y2 });
+      if (ev.clientY < BORDA) velocidade = -Math.round((BORDA - ev.clientY) / 2) - 4;
+      else if (ev.clientY > window.innerHeight - BORDA) velocidade = Math.round((ev.clientY - (window.innerHeight - BORDA)) / 2) + 4;
+      else velocidade = 0;
+    }
+    function onUp() {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const rect = { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) };
+      if (rect.right - rect.left > 4 || rect.bottom - rect.top > 4) {
+        const hits = new Set<string>();
+        document.querySelectorAll('[data-video-id]').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.left < rect.right && r.right > rect.left && r.top < rect.bottom && r.bottom > rect.top) {
+            hits.add(el.getAttribute('data-video-id')!);
+          }
+        });
+        setSelected((prev) => (additive ? new Set([...prev, ...hits]) : hits));
+      }
+      setMarquee(null);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  useEffect(() => {
+    document.addEventListener('mousedown', onBoardMouseDown);
+    return () => document.removeEventListener('mousedown', onBoardMouseDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function contextItemsFor(video: VideoProject): ContextMenuItem[] {
+    const outrasEtapas = stageOrder.filter((s) => s !== video.stage);
+    return [
+      { label: 'Abrir', icon: <FolderOpen size={15} />, onSelect: () => setOpenId(video.id) },
+      {
+        label: 'Duplicar',
+        icon: <Copy size={15} />,
+        onSelect: () => addVideo({ title: video.title + ' (cópia)', clientId: video.clientId, editor: video.editor, dueDate: video.dueDate, notes: video.notes }),
+      },
+      ...outrasEtapas.map((s) => ({
+        label: `Mover para ${VIDEO_STAGE_META[s].label}`,
+        icon: <ArrowRightCircle size={15} />,
+        onSelect: () => moveVideo(video.id, s),
+      })),
+      { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => removeVideo(video.id) },
+    ];
   }
 
   function handleCardClick(video: VideoProject, e: React.MouseEvent) {
@@ -103,23 +204,44 @@ export default function Videos() {
   }
 
   return (
-    <div>
+    <div className="min-h-[calc(100vh-6rem)]">
       <PageHeader
         title="Edição de Vídeo"
-        subtitle="Do briefing à entrega. Arraste os projetos entre as etapas."
+        subtitle="Do briefing à entrega. Arraste os projetos entre as etapas, ou clique e arraste na área vazia pra selecionar vários."
         action={<Button onClick={() => setCreating(true)}><Plus size={18} /> Novo vídeo</Button>}
       />
 
       <DndContext sensors={sensors} collisionDetection={pointerWithin}
         onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {VIDEO_STAGE_ORDER.map((stage) => (
-            <VideoColumn key={stage} stage={stage} videos={byStage[stage] || []} clientMap={clientMap}
-              selected={selected} onCardClick={handleCardClick} />
-          ))}
-        </div>
-        <DragOverlay>{activeVideo ? <VideoCard video={activeVideo} clientMap={clientMap} dragging /> : null}</DragOverlay>
+        <SortableContext items={stageOrder.map((s) => `col-${s}`)} strategy={horizontalListSortingStrategy}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {stageOrder.map((stage) => (
+              <VideoColumn key={stage} stage={stage} videos={byStage[stage] || []} clientMap={clientMap}
+                selected={selected} onCardClick={handleCardClick}
+                onCardContextMenu={(video, e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, video }); }} />
+            ))}
+          </div>
+        </SortableContext>
+        <DragOverlay>
+          {activeVideo ? <VideoCard video={activeVideo} clientMap={clientMap} dragging />
+            : activeStage ? <div className="flex w-72 shrink-0 items-center gap-2 rounded-xl border border-brand-400/60 bg-ink-850 px-3 py-2.5 shadow-2xl"><span className="h-2.5 w-2.5 rounded-full" style={{ background: VIDEO_STAGE_META[activeStage].color }} /><span className="text-sm font-semibold text-white/90">{VIDEO_STAGE_META[activeStage].label}</span></div>
+            : null}
+        </DragOverlay>
       </DndContext>
+
+      {marquee && (
+        <div
+          className="pointer-events-none fixed z-50 border border-brand-400/60 bg-brand-500/15"
+          style={{
+            left: Math.min(marquee.x1, marquee.x2), top: Math.min(marquee.y1, marquee.y2),
+            width: Math.abs(marquee.x2 - marquee.x1), height: Math.abs(marquee.y2 - marquee.y1),
+          }}
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} items={contextItemsFor(contextMenu.video)} onClose={() => setContextMenu(null)} />
+      )}
 
       {openId && <VideoModal videoId={openId} onClose={() => setOpenId(null)} />}
 
@@ -163,15 +285,23 @@ export default function Videos() {
   );
 }
 
-function VideoColumn({ stage, videos, clientMap, selected, onCardClick }: {
+function VideoColumn({ stage, videos, clientMap, selected, onCardClick, onCardContextMenu }: {
   stage: VideoStage; videos: VideoProject[]; clientMap: ReturnType<typeof useClientMap>;
   selected: Set<string>; onCardClick: (video: VideoProject, e: React.MouseEvent) => void;
+  onCardContextMenu: (video: VideoProject, e: React.MouseEvent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
+  const {
+    setNodeRef: setColRef, attributes, listeners, transform, transition, isDragging,
+  } = useSortable({ id: `col-${stage}` });
   const meta = VIDEO_STAGE_META[stage];
   return (
-    <div className="flex w-72 shrink-0 flex-col">
-      <div className="mb-2 flex items-center gap-2 px-1">
+    <div
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className="flex w-72 shrink-0 flex-col"
+    >
+      <div ref={setColRef} {...attributes} {...listeners} className="mb-2 flex cursor-grab items-center gap-2 px-1 active:cursor-grabbing">
+        <GripVertical size={14} className="text-white/20" />
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: meta.color }} />
         <span className="text-sm font-semibold text-white/85">{meta.label}</span>
         <span className="rounded-full bg-white/10 px-2 text-xs text-white/50">{videos.length}</span>
@@ -179,7 +309,8 @@ function VideoColumn({ stage, videos, clientMap, selected, onCardClick }: {
       <div ref={setNodeRef} className={cn('flex min-h-[120px] flex-1 flex-col gap-2 rounded-2xl border border-line/60 bg-ink-900/40 p-2 transition', isOver && 'border-brand-400/60 bg-brand-500/10')}>
         {videos.map((v) => (
           <DraggableVideo key={v.id} video={v} clientMap={clientMap}
-            isSelected={selected.has(v.id)} onClick={(e) => onCardClick(v, e)} />
+            isSelected={selected.has(v.id)} onClick={(e) => onCardClick(v, e)}
+            onContextMenu={(e) => onCardContextMenu(v, e)} />
         ))}
         {videos.length === 0 && <div className="grid flex-1 place-items-center py-6 text-xs text-white/25">Solte aqui</div>}
       </div>
@@ -187,12 +318,12 @@ function VideoColumn({ stage, videos, clientMap, selected, onCardClick }: {
   );
 }
 
-function DraggableVideo({ video, onClick, clientMap, isSelected }: {
-  video: VideoProject; onClick: (e: React.MouseEvent) => void; clientMap: ReturnType<typeof useClientMap>; isSelected: boolean;
+function DraggableVideo({ video, onClick, onContextMenu, clientMap, isSelected }: {
+  video: VideoProject; onClick: (e: React.MouseEvent) => void; onContextMenu: (e: React.MouseEvent) => void; clientMap: ReturnType<typeof useClientMap>; isSelected: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: video.id });
   return (
-    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...attributes} {...listeners} onClick={onClick}>
+    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...attributes} {...listeners} data-video-id={video.id} onClick={onClick} onContextMenu={onContextMenu}>
       <VideoCard video={video} clientMap={clientMap} selected={isSelected} />
     </div>
   );
