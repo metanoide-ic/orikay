@@ -3,11 +3,21 @@ import { useData } from './dataStore';
 import { useSettings } from './settingsStore';
 import { onApproved, onRejected } from './automations';
 import { markChargePaid } from './billing';
+import { uid } from './utils';
 
 /** Resposta do grupo sobre um post. */
 interface PostDecision {
   tipo?: 'post';
   postId: string;
+  decisao: 'aprovado' | 'alteracao';
+  texto: string;
+  quando: number;
+}
+
+/** Resposta do grupo sobre um cartão de Quadros em coluna de Alteração Automática. */
+interface CardDecision {
+  tipo: 'card';
+  cardId: string;
   decisao: 'aprovado' | 'alteracao';
   texto: string;
   quando: number;
@@ -21,7 +31,7 @@ interface PaymentDecision {
   quando: number;
 }
 
-type Decision = PostDecision | PaymentDecision;
+type Decision = PostDecision | CardDecision | PaymentDecision;
 
 /**
  * Troca "/webhook" por outro caminho no endereço do conector, preservando
@@ -68,6 +78,23 @@ export async function pullDecisions(): Promise<number> {
       const cobranca = store.charges.find((c) => c.id === d.chargeId);
       if (!cobranca || cobranca.status === 'paga') continue;
       markChargePaid(d.chargeId);
+      aplicadas++;
+      continue;
+    }
+
+    if (d.tipo === 'card') {
+      const board = store.boards.find((b) => b.cards[d.cardId]);
+      if (!board) continue;
+      if (d.decisao === 'aprovado') {
+        store.updateCard(board.id, d.cardId, { awaitingClientReply: false });
+        store.addEvent({ channel: 'whatsapp', title: `Cliente aprovou: "${board.cards[d.cardId].title}"`, status: 'ok' });
+      } else {
+        const card = board.cards[d.cardId];
+        store.updateCard(board.id, d.cardId, {
+          checklist: [...card.checklist, { id: uid('ck'), text: d.texto || 'Alteração pedida pelo cliente.', done: false }],
+        });
+        store.addEvent({ channel: 'whatsapp', title: `Alteração pedida: "${card.title}"`, status: 'ok', detail: d.texto });
+      }
       aplicadas++;
       continue;
     }

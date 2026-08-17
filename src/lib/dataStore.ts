@@ -3,11 +3,13 @@ import { persist } from 'zustand/middleware';
 import type {
   AutomationEvent,
   Board,
+  BoardArea,
   Campaign,
   Card,
   Charge,
   Client,
   Column,
+  ColumnAutomation,
   LibraryItem,
   Post,
   PostStage,
@@ -49,13 +51,14 @@ interface DataState {
   removeClient: (id: string) => void;
 
   // Quadros
-  addBoard: (b: { name: string; description?: string; clientId?: string }) => Board;
+  addBoard: (b: { name: string; description?: string; clientId?: string; area?: BoardArea }) => Board;
   /** Retorna o quadro do cliente, criando um se ainda não existir. */
   ensureClientBoard: (clientId: string, name: string) => Board;
   removeBoard: (id: string) => void;
   renameBoard: (id: string, name: string) => void;
-  addColumn: (boardId: string, title: string) => void;
+  addColumn: (boardId: string, title: string, automation?: ColumnAutomation) => void;
   renameColumn: (boardId: string, colId: string, title: string) => void;
+  setColumnAutomation: (boardId: string, colId: string, automation: ColumnAutomation) => void;
   removeColumn: (boardId: string, colId: string) => void;
   addCard: (boardId: string, colId: string, card: Partial<Card> & { title: string }) => void;
   updateCard: (boardId: string, cardId: string, patch: Partial<Card>) => void;
@@ -170,13 +173,14 @@ export const useData = create<DataState>()(
         set((s) => ({ clients: s.clients.filter((c) => c.id !== id) })),
 
       // ---------- Quadros ----------
-      addBoard: ({ name, description, clientId }) => {
+      addBoard: ({ name, description, clientId, area }) => {
         const mk = (title: string): Column => ({ id: uid('col'), title, cardIds: [] });
         const board: Board = {
           id: uid('board'),
           name,
           description,
           clientId,
+          area,
           columns: [mk('A fazer'), mk('Em produção'), mk('Revisão'), mk('Prontos'), mk('Concluído')],
           cards: {},
           createdAt: Date.now(),
@@ -195,11 +199,11 @@ export const useData = create<DataState>()(
         set((s) => ({
           boards: s.boards.map((b) => (b.id === id ? { ...b, name } : b)),
         })),
-      addColumn: (boardId, title) =>
+      addColumn: (boardId, title, automation) =>
         set((s) => ({
           boards: s.boards.map((b) =>
             b.id === boardId
-              ? { ...b, columns: [...b.columns, { id: uid('col'), title, cardIds: [] }] }
+              ? { ...b, columns: [...b.columns, { id: uid('col'), title, cardIds: [], automation }] }
               : b,
           ),
         })),
@@ -211,6 +215,14 @@ export const useData = create<DataState>()(
                   ...b,
                   columns: b.columns.map((c) => (c.id === colId ? { ...c, title } : c)),
                 }
+              : b,
+          ),
+        })),
+      setColumnAutomation: (boardId, colId, automation) =>
+        set((s) => ({
+          boards: s.boards.map((b) =>
+            b.id === boardId
+              ? { ...b, columns: b.columns.map((c) => (c.id === colId ? { ...c, automation } : c)) }
               : b,
           ),
         })),
@@ -240,6 +252,8 @@ export const useData = create<DataState>()(
               assigneeId: card.assigneeId,
               checklist: card.checklist ?? [],
               createdAt: Date.now(),
+              mediaUrl: card.mediaUrl,
+              awaitingClientReply: card.awaitingClientReply,
             };
             return {
               ...b,

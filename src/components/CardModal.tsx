@@ -55,6 +55,14 @@ export function CardModal({
           />
         </Field>
 
+        <Field label="Link da arte/vídeo pronto" hint="Precisa de um link público (Drive, etc). Usado pelo Envio Automático e é obrigatório pro Post Automático.">
+          <Input
+            value={card.mediaUrl ?? ''}
+            onChange={(e) => updateCard(boardId, cardId, { mediaUrl: e.target.value || undefined })}
+            placeholder="https://…"
+          />
+        </Field>
+
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Prioridade">
             <Select

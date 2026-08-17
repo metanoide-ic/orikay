@@ -636,10 +636,32 @@ async function receberMensagem(corpo) {
   const fila = aguardando.get(msg.grupo) || [];
   if (fila.length === 0) return null; // nada esperando resposta nesse grupo
 
+  const alvo = fila[fila.length - 1]; // o mais recente enviado ao grupo
+
+  // Cartão em Alteração Automática: não classifica aprova/reprova — cada
+  // mensagem que o cliente manda vira um item novo no checklist do cartão,
+  // e o cartão continua na fila (aceitando mais itens) até o cliente
+  // aprovar de fato. É assim que a lista de alterações vai se formando.
+  if (alvo.cardId) {
+    const decisao = interpretar(msg.texto);
+    if (decisao === 'aprovado') {
+      fila.pop();
+      if (fila.length === 0) aguardando.delete(msg.grupo);
+      decisoes.push({ tipo: 'card', cardId: alvo.cardId, decisao: 'aprovado', texto: String(msg.texto).slice(0, 500), quando: Date.now() });
+      registrar('resposta', `${alvo.titulo}: cliente aprovou`);
+      return 'aprovado';
+    }
+    // Qualquer outra coisa que o cliente mandar (reprovou, ou foi só listando
+    // o que quer mudar) vira item de alteração — mesmo sem bater com nenhuma
+    // palavra-chave, porque nem sempre o cliente escreve "reprovado" antes.
+    decisoes.push({ tipo: 'card', cardId: alvo.cardId, decisao: 'alteracao', texto: String(msg.texto).slice(0, 500), quando: Date.now() });
+    registrar('resposta', `${alvo.titulo}: cliente pediu alteração`);
+    return 'alteracao';
+  }
+
   const decisao = interpretar(msg.texto);
   if (!decisao) return null;
 
-  const alvo = fila[fila.length - 1]; // o post mais recente enviado ao grupo
   fila.pop();
   if (fila.length === 0) aguardando.delete(msg.grupo);
 
@@ -813,9 +835,9 @@ async function processar(evento) {
 
   if (tipo === 'aprovacao') {
     await enviarWhatsapp(evento.grupo, evento.mensagem);
-    if (evento.postId) {
+    if (evento.postId || evento.cardId) {
       const fila = aguardando.get(evento.grupo) || [];
-      fila.push({ postId: evento.postId, titulo: evento.titulo, cliente: evento.cliente, quando: Date.now() });
+      fila.push({ postId: evento.postId, cardId: evento.cardId, titulo: evento.titulo, cliente: evento.cliente, quando: Date.now() });
       aguardando.set(evento.grupo, fila);
     }
     registrar('aprovacao', `"${evento.titulo}" enviado ao grupo de ${evento.cliente || 'cliente'}`);

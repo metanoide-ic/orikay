@@ -106,19 +106,37 @@ export interface Card {
   assigneeId?: ID;
   checklist: ChecklistItem[];
   createdAt: number;
+  /** Link público da arte/vídeo pronto — usado pela coluna "Post Automático" para publicar. */
+  mediaUrl?: string;
+  /** Marca que o cartão está numa coluna de Alteração Automática, esperando resposta do grupo. */
+  awaitingClientReply?: boolean;
 }
+
+/**
+ * O que acontece sozinho quando um cartão entra na coluna:
+ * - envio: manda o cartão pro grupo de WhatsApp do cliente certo.
+ * - alteracao: manda pro grupo e, a partir daí, cada resposta do cliente
+ *   vira um item novo no checklist do cartão (as alterações pedidas).
+ * - post: publica automaticamente feed + story no Instagram do cliente.
+ */
+export type ColumnAutomation = 'nenhuma' | 'envio' | 'alteracao' | 'post';
 
 export interface Column {
   id: ID;
   title: string;
   cardIds: ID[];
+  automation?: ColumnAutomation;
 }
+
+/** Área do quadro: de qual função da equipe é a rotina de trabalho. */
+export type BoardArea = 'designer' | 'filmmaker' | 'trafego' | 'outro';
 
 export interface Board {
   id: ID;
   name: string;
   description?: string;
   clientId?: ID;
+  area?: BoardArea;
   columns: Column[];
   cards: Record<ID, Card>;
   createdAt: number;

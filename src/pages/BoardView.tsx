@@ -25,13 +25,14 @@ import {
   CheckSquare,
   Calendar,
 } from 'lucide-react';
-import { Button, Badge, Input, Avatar } from '@/components/ui';
+import { Button, Badge, Input, Avatar, Select } from '@/components/ui';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
 import { useClientMap } from '@/lib/hooks';
-import { PRIORITY_META } from '@/lib/labels';
+import { PRIORITY_META, AUTOMATION_META } from '@/lib/labels';
+import { runColumnAutomation } from '@/lib/boardAutomations';
 import { cn } from '@/lib/utils';
-import type { Card as CardT } from '@/lib/types';
+import type { Card as CardT, ColumnAutomation } from '@/lib/types';
 import { CardModal } from '@/components/CardModal';
 
 export default function BoardView() {
@@ -45,6 +46,7 @@ export default function BoardView() {
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [addingCol, setAddingCol] = useState(false);
   const [colName, setColName] = useState('');
+  const [colAutomation, setColAutomation] = useState<ColumnAutomation>('nenhuma');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -85,11 +87,18 @@ export default function BoardView() {
     const toCol = columnOf(overId);
     if (!toCol) return;
 
+    const fromCol = columnOf(activeCardId);
     const targetCol = board.columns.find((c) => c.id === toCol)!;
     const filtered = targetCol.cardIds.filter((id) => id !== activeCardId);
     let index = filtered.indexOf(overId);
     if (index === -1) index = filtered.length; // soltou na coluna vazia / no fim
     moveCard(board.id, activeCardId, toCol, index);
+
+    // A automação só dispara ao entrar de verdade numa coluna nova — reordenar
+    // dentro da mesma coluna não conta, senão mandaria mensagem à toa.
+    if (fromCol !== toCol && targetCol.automation && targetCol.automation !== 'nenhuma') {
+      void runColumnAutomation(board.id, activeCardId, targetCol.automation);
+    }
   }
 
   const client = board.clientId ? clientMap[board.clientId] : undefined;
@@ -137,20 +146,28 @@ export default function BoardView() {
                   placeholder="Nome da coluna"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && colName.trim()) {
-                      addColumn(board.id, colName.trim());
-                      setColName('');
-                      setAddingCol(false);
-                    }
                     if (e.key === 'Escape') setAddingCol(false);
                   }}
                 />
+                <Select
+                  className="mt-2"
+                  value={colAutomation}
+                  onChange={(e) => setColAutomation(e.target.value as ColumnAutomation)}
+                >
+                  {(Object.keys(AUTOMATION_META) as ColumnAutomation[]).map((a) => (
+                    <option key={a} value={a}>{AUTOMATION_META[a].label}</option>
+                  ))}
+                </Select>
+                {colAutomation !== 'nenhuma' && (
+                  <p className="mt-1.5 text-xs text-white/40">{AUTOMATION_META[colAutomation].hint}</p>
+                )}
                 <div className="mt-2 flex gap-2">
                   <Button
                     size="sm"
                     onClick={() => {
-                      if (colName.trim()) addColumn(board.id, colName.trim());
+                      if (colName.trim()) addColumn(board.id, colName.trim(), colAutomation === 'nenhuma' ? undefined : colAutomation);
                       setColName('');
+                      setColAutomation('nenhuma');
                       setAddingCol(false);
                     }}
                   >
@@ -196,7 +213,7 @@ function ColumnView({
   onOpenCard,
 }: {
   boardId: string;
-  col: { id: string; title: string; cardIds: string[] };
+  col: { id: string; title: string; cardIds: string[]; automation?: ColumnAutomation };
   cards: CardT[];
   onOpenCard: (id: string) => void;
 }) {
@@ -204,11 +221,13 @@ function ColumnView({
   const addCard = useData((s) => s.addCard);
   const renameColumn = useData((s) => s.renameColumn);
   const removeColumn = useData((s) => s.removeColumn);
+  const setColumnAutomation = useData((s) => s.setColumnAutomation);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
   const [menu, setMenu] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [colTitle, setColTitle] = useState(col.title);
+  const automation = col.automation && col.automation !== 'nenhuma' ? col.automation : null;
 
   return (
     <div className="flex w-72 shrink-0 flex-col">
@@ -234,9 +253,18 @@ function ColumnView({
           <button
             onClick={() => setEditingTitle(true)}
             className="flex items-center gap-2 text-sm font-semibold text-white/85"
+            title={automation ? AUTOMATION_META[automation].hint : undefined}
           >
             {col.title}
             <span className="rounded-full bg-white/10 px-2 text-xs text-white/50">{cards.length}</span>
+            {automation && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                style={{ background: `${AUTOMATION_META[automation].color}22`, color: AUTOMATION_META[automation].color }}
+              >
+                {AUTOMATION_META[automation].short}
+              </span>
+            )}
           </button>
         )}
         <div className="relative">
@@ -249,7 +277,22 @@ function ColumnView({
           {menu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-              <div className="absolute right-0 z-20 mt-1 w-40 rounded-xl border border-line bg-ink-800 p-1 shadow-xl">
+              <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-line bg-ink-800 p-1 shadow-xl">
+                <div className="px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-white/35">Automação</div>
+                {(Object.keys(AUTOMATION_META) as ColumnAutomation[]).map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => { setColumnAutomation(boardId, col.id, a); setMenu(false); }}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-white/5',
+                      (col.automation ?? 'nenhuma') === a ? 'text-white' : 'text-white/60',
+                    )}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: AUTOMATION_META[a].color }} />
+                    {AUTOMATION_META[a].label}
+                  </button>
+                ))}
+                <div className="my-1 border-t border-line" />
                 <button
                   onClick={() => {
                     removeColumn(boardId, col.id);

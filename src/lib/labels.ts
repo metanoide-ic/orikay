@@ -1,4 +1,4 @@
-import type { PostPlatform, PostStage, Priority, VideoStage } from './types';
+import type { BoardArea, ColumnAutomation, PostPlatform, PostStage, Priority, VideoStage } from './types';
 
 export const STAGE_META: Record<PostStage, { label: string; color: string }> = {
   ideia: { label: 'Ideia', color: '#94a3b8' },
@@ -54,6 +54,29 @@ export const PRIORITY_META: Record<Priority, { label: string; color: string }> =
   media: { label: 'Média', color: '#38bdf8' },
   alta: { label: 'Alta', color: '#f59e0b' },
   urgente: { label: 'Urgente', color: '#ef4444' },
+};
+
+export const AUTOMATION_META: Record<ColumnAutomation, { label: string; short: string; color: string; hint: string }> = {
+  nenhuma: { label: 'Nenhuma', short: '', color: '#64748b', hint: 'Coluna comum, sem automação.' },
+  envio: {
+    label: 'Envio Automático', short: 'Envio', color: '#38bdf8',
+    hint: 'Ao soltar um cartão aqui, manda sozinho pro grupo de WhatsApp do cliente vinculado ao cartão.',
+  },
+  alteracao: {
+    label: 'Alteração Automática', short: 'Alteração', color: '#f43f5e',
+    hint: 'Pede aprovação no grupo do cliente. Cada resposta do cliente vira um item novo no checklist do cartão.',
+  },
+  post: {
+    label: 'Post Automático', short: 'Post', color: '#ec4899',
+    hint: 'Publica feed + story no Instagram do cliente. O cartão precisa ter o link da arte/vídeo.',
+  },
+};
+
+export const BOARD_AREA_META: Record<BoardArea, { label: string }> = {
+  designer: { label: 'Designer' },
+  filmmaker: { label: 'Filmmaker' },
+  trafego: { label: 'Gestor de Tráfego' },
+  outro: { label: 'Outros quadros' },
 };
 
 export const PLATFORMS: PostPlatform[] = [
