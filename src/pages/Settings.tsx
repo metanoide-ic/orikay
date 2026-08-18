@@ -188,6 +188,14 @@ export default function Settings() {
               }}>
                 Repor fee e forma de pagamento
               </Button>
+              <Button variant="outline" onClick={() => {
+                const n = data.restoreBriefings();
+                setBackupMsg(n === 0
+                  ? 'Todo mundo já está com o briefing mais atual (ou com um briefing que a equipe editou na tela, que não é mexido).'
+                  : `${n} briefing(s) atualizado(s) com a pesquisa mais recente sobre cada cliente. Briefing que a equipe já tinha editado na tela não foi tocado.`);
+              }}>
+                Atualizar briefings pesquisados
+              </Button>
               <Button variant="danger" onClick={() => setConfirmReset(true)}>
                 Limpar todos os dados
               </Button>

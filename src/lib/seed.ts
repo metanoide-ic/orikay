@@ -67,8 +67,8 @@ const CARTEIRA: Entrada[] = [
     area: 'nacional',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
-      'Financeira focada em financiamento e refinanciamento de carros, motos e caminhões, com mais de 30 anos e presença em mais de 100 cidades. Trabalha por uma rede de Agentes Omni, correspondentes bancários espalhados pelo Brasil: o mesmo conteúdo serve para todos os agentes, e só feirões e ações locais pedem peça exclusiva. Comunicação popular, comercial e voltada à conversão. Azul royal, branco e laranja, com veículos, pessoas reais, movimento e headlines curtas de grande impacto. Pautas recorrentes: feirões, ações em loja, refinanciamento, Plano Renova, campanhas sazonais e material para correspondentes e lojistas.',
-    nota: 'Conteúdo único para todos os agentes. Os agentes ficam em praças diferentes, inclusive em outros estados, então feirão e ação local entram como peça extra com a cidade daquele agente.',
+      'Financeira focada em financiamento e refinanciamento de carros, motos e caminhões. No mercado desde 1994 (27 anos de atuação), com mais de 4,7 milhões de clientes atendidos e rede de mais de 100 correspondentes exclusivos (Agentes Omni) espalhados por 13 estados do Brasil. Faz parte do Conglomerado Prudencial Omni, autorizado pelo Banco Central. Trabalha por uma rede de Agentes Omni, correspondentes bancários espalhados pelo Brasil: o mesmo conteúdo serve para todos os agentes, e só feirões e ações locais pedem peça exclusiva. Comunicação popular, comercial e voltada à conversão. Azul royal, branco e laranja, com veículos, pessoas reais, movimento e headlines curtas de grande impacto. Pautas recorrentes: feirões, ações em loja, refinanciamento, Plano Renova, campanhas sazonais e material para correspondentes e lojistas.',
+    nota: 'Conteúdo único para todos os agentes. Os agentes ficam em praças diferentes, inclusive em outros estados, então feirão e ação local entram como peça extra com a cidade daquele agente. Números de mercado (anos de atuação, base de clientes) confirmados por pesquisa pública em agosto de 2026 — reconferir periodicamente, pois evoluem.',
   },
   {
     nome: 'Vidroscar',
@@ -77,7 +77,8 @@ const CARTEIRA: Entrada[] = [
     area: 'regiao',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Foto'] },
     briefing:
-      'Para-brisas, vidros automotivos, insulfilm e higienização e manutenção de ar-condicionado automotivo. Visual moderno e técnico: azul escuro, azul claro e ciano, laranja pontual, carros valorizados e estética limpa, sem aparência artificial. O conteúdo parte de problemas reais do motorista: vidro trincado ou quebrado, segurança, insulfilm, ar-condicionado. Objetivo principal é gerar contato.',
+      'Para-brisas, vidros automotivos, insulfilm e higienização e manutenção de ar-condicionado automotivo. Endereço confirmado: Via Sérgio Braga, 520, Ponte Alta, Volta Redonda/RJ. Atende veículos nacionais e importados, de carro de passeio a caminhão e micro-ônibus. Visual moderno e técnico: azul escuro, azul claro e ciano, laranja pontual, carros valorizados e estética limpa, sem aparência artificial. O conteúdo parte de problemas reais do motorista: vidro trincado ou quebrado, segurança, insulfilm, ar-condicionado. Objetivo principal é gerar contato.',
+    nota: 'Endereço e escopo de atendimento confirmados por pesquisa pública (RioSulVeiculos) em agosto de 2026.',
   },
   {
     nome: 'Rede de Postos Margarida',
@@ -87,7 +88,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [SEG]: ['Post'], [QUA]: ['Vídeo'], [SEX]: ['Post'] },
     briefing:
       'Rede de postos de combustíveis com comunicação popular, próxima, voltada ao motorista e à família. Verde vibrante, amarelo e branco, com vermelho nos preços; campanhas específicas podem ganhar um tratamento mais premium. Destaques: qualidade dos combustíveis, economia, confiança, estrada e o diferencial do Diesel S10 aditivado.',
-    nota: 'Segunda é o post da Terça da Sorte, a promoção da rede. Antes de produzir, perguntar ao cliente o valor da semana. Quarta e sexta alternam vídeo e post.',
+    nota: 'Segunda é o post da Terça da Sorte, a promoção da rede. Antes de produzir, perguntar ao cliente o valor da semana. Quarta e sexta alternam vídeo e post. Pesquisa pública em agosto de 2026 só confirmou o perfil no Instagram (@redepostomargarida); sem detalhe adicional verificável — manter esse briefing como está até o cliente confirmar mais dados.',
   },
   {
     nome: 'Carpintaria Meirelles',
@@ -96,7 +97,8 @@ const CARTEIRA: Entrada[] = [
     area: 'regiao',
     cadencia: { [TER]: ['Vídeo'], [QUI]: ['Post'] },
     briefing:
-      'Carpintaria e marcenaria, principalmente portas, janelas e projetos sob medida. Identidade sofisticada e artesanal: verde escuro e petróleo, verde turquesa, branco e tons naturais de madeira. A comunicação valoriza acabamento, qualidade, tradição, trabalho bem-feito, personalização e o cuidado de cada projeto.',
+      'Carpintaria e marcenaria, principalmente portas, janelas e projetos sob medida. Fundada em 1959 por João Meirelles em Santa Rita de Jacutinga, com operação em Barra Mansa desde 1969 — mais de 65 anos de tradição no ramo. Hoje sob administração de Carlos Henrique Meirelles. Endereço: Avenida Domingos Mariano, 428, Centro, Barra Mansa/RJ, com atendimento de segunda a sábado, das 8h às 18h30. Identidade sofisticada e artesanal: verde escuro e petróleo, verde turquesa, branco e tons naturais de madeira. A comunicação valoriza acabamento, qualidade, tradição, trabalho bem-feito, personalização e o cuidado de cada projeto — a história de mais de sessenta anos da família Meirelles é um argumento de peso a explorar.',
+    nota: 'Fundação, endereço e horário confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'Barra Escap Autocenter',
@@ -105,7 +107,8 @@ const CARTEIRA: Entrada[] = [
     area: 'cidade',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
-      'Centro automotivo: escapamento, pneus, óleo, alinhamento, balanceamento, suspensão, freios e manutenção preventiva. Alto impacto em preto e grafite, amarelo e dourado, branco, com referências a asfalto, pneu, metal e oficina. O conteúdo mistura oferta agressiva, diagnóstico de problema, educação automotiva e chamada direta para levar o veículo à oficina.',
+      'Centro automotivo: pneus novos e remoldados, alinhamento, balanceamento, suspensão, escapamento, óleo, manutenção preventiva, engate para reboque, protetor de cárter e inspeção de fumaça (emissão). Endereço: Rua José Marcelino de Camargo, 675, Centro, Barra Mansa/RJ. Alto impacto em preto e grafite, amarelo e dourado, branco, com referências a asfalto, pneu, metal e oficina. O conteúdo mistura oferta agressiva, diagnóstico de problema, educação automotiva e chamada direta para levar o veículo à oficina.',
+    nota: 'Endereço e lista de serviços confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'Start Car',
@@ -115,7 +118,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
       'Loja multimarcas de veículos, comunicação jovem, comercial e orientada à venda. Azul escuro, branco e amarelo, com mascote presente e grande destaque para os veículos e as condições comerciais. Campanhas de oferta, aniversário da loja, oportunidades especiais, datas comemorativas e argumentos para acelerar a decisão de compra.',
-    nota: 'Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo.',
+    nota: 'Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo. Pesquisa pública em agosto de 2026 não encontrou uma loja "Start Car" confirmada em Barra Mansa/Volta Redonda (há outras "Start Car" de mesmo nome em outras cidades, não confundir) — manter esse briefing como está até confirmar com o cliente.',
   },
   {
     nome: 'RPM Veículos',
@@ -124,8 +127,8 @@ const CARTEIRA: Entrada[] = [
     area: 'regiao',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
-      'Segmento automotivo, vendas e campanhas com carros e motos. Azul royal, branco e ciano, veículos em cenário urbano ou rodoviário, comunicação dinâmica. Além do comercial, produzimos campanhas internas de metas, premiações, vouchers e peças comemorativas.',
-    nota: 'Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo.',
+      'Loja de veículos multimarcas no Centro de Barra Mansa/RJ, em operação desde 2016, formalmente C R Mota Automóveis Ltda. Atendimento personalizado em duas lojas no Centro da cidade, com veículos revisados e higienizados, aprovação de financiamento pelo WhatsApp, parcelamento em até 60x sem entrada ou no cartão em até 12x. Segmento automotivo, vendas e campanhas com carros e motos. Azul royal, branco e ciano, veículos em cenário urbano ou rodoviário, comunicação dinâmica. Além do comercial, produzimos campanhas internas de metas, premiações, vouchers e peças comemorativas.',
+    nota: 'Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo. Histórico e condições de financiamento confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'Connecta Telesaúde Digital',
@@ -134,7 +137,8 @@ const CARTEIRA: Entrada[] = [
     area: 'nacional',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
-      'Telemedicina com consultas online, proposta de tornar o atendimento médico acessível e prático. Identidade clara e moderna: branco, azul e turquesa, verde-limão e azul escuro, com médicos, pacientes e celulares. A comunicação destaca atendimento online, praticidade, preço acessível, disponibilidade 24h e os benefícios dos planos individuais e empresariais.',
+      'Telemedicina com consultas online (connectatelesaude.com.br), proposta de tornar o atendimento médico acessível e prático. Consultas com médicos de diversas especialidades direto do celular ou computador, sistema próprio hospedado no Brasil e adequado à LGPD, atendimento 24h por dia e descontos exclusivos em farmácias e exames — implantação para empresas em 30 dias, sem investimento em infraestrutura. Identidade clara e moderna: branco, azul e turquesa, verde-limão e azul escuro, com médicos, pacientes e celulares. A comunicação destaca atendimento online, praticidade, preço acessível, disponibilidade 24h e os benefícios dos planos individuais e empresariais.',
+    nota: 'Site e diferenciais (LGPD, implantação em 30 dias) confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'AH-I Entertainment',
@@ -144,6 +148,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
       'Provedor de internet com posicionamento jovem e tecnológico, ligado a games, streaming, conectividade e vida digital. Estética tech e gamer: base escura, ciano, azul, amarelo e toques neon, com as peças sempre iluminadas e modernas. Pautas: estabilidade, velocidade, Wi-Fi, vários dispositivos ao mesmo tempo, situações do dia a dia e motivos para trocar de provedor.',
+    nota: 'Pesquisa pública em agosto de 2026 confirmou só o perfil no Instagram (@provedor.ahi), sem detalhe adicional verificável (endereço, área de cobertura, planos) — manter esse briefing como está até o cliente confirmar mais dados.',
   },
   {
     nome: 'Nascimento & Nascimento Advogados',
@@ -153,6 +158,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
       'Escritório jurídico tradicional, cerca de 40 anos de atuação, forte em direito previdenciário e causas de servidores. Identidade premium e institucional: azul-petróleo escuro, branco e detalhes dourados e bege. Pautas: INSS, aposentadoria, professores, piso do magistério, paridade, imposto de renda, benefícios negados e direitos pouco conhecidos.',
+    nota: 'Pesquisa pública em agosto de 2026 encontrou vários escritórios "Nascimento Advogados" em outras cidades/estados (não confundir), mas não confirmou o escritório específico da carteira — manter esse briefing (já detalhado a partir do operacional real) como está até checagem com o cliente.',
   },
   {
     nome: 'Sterna Café Barra Mansa',
@@ -162,8 +168,8 @@ const CARTEIRA: Entrada[] = [
     fee: 2000, dia: 25, forma: 'pix', pagador: 'PENA & MENEGHITTI',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
-      'Unidade local da rede Sterna Café, franquia de cafeteria especializada em café especial brasileiro (grãos 100% especiais de várias regiões, métodos de extração internacionais). Cardápio variado: cafés quentes e gelados, massas, refeições, saladas, sanduíches, salgados e sobremesas. Identidade da marca remete à ave sterna, a que mais viaja no mundo — conceito de experiência, cada xícara como uma descoberta. Comunicação deve valorizar o preparo, o ambiente e o produto com foto real.',
-    nota: 'Fee, vencimento e forma de pagamento vieram do controle financeiro; briefing e identidade vieram de pesquisa pública (site e Instagram da marca). Cadência ainda não foi confirmada pelo cliente.',
+      'Unidade local da rede Sterna Café (mais de 50 lojas no país, majoritariamente em SP) — a primeira unidade do interior do Rio de Janeiro, inaugurada no bairro Ano Bom, em Barra Mansa. Endereço: Rua Abdo Felipe, 126, Ano Bom, Barra Mansa/RJ, aberto de segunda a sábado, das 9h às 20h. Dirigida por Ana Beatriz Meneghitti Reis. Especializada em café especial brasileiro, com seis métodos de extração (Aeropress, Chemex, Clever, prensa francesa, Hario V60 e Koar). Cardápio variado: cafés quentes e gelados, brunch com pratos temáticos de país (Paris, Japão, Itália, Brasil), massas, refeições, saladas, sanduíches, salgados e sobremesas. Identidade da marca remete à ave sterna, a que mais viaja no mundo — conceito de experiência, cada xícara como uma descoberta. Comunicação deve valorizar o preparo, os métodos de extração, o ambiente e o produto com foto real.',
+    nota: 'Fee, vencimento e forma de pagamento vieram do controle financeiro; briefing, identidade, endereço e horário vieram de pesquisa pública (site e Instagram da marca, matérias locais), atualizada em agosto de 2026. Cadência ainda não foi confirmada pelo cliente.',
   },
   {
     nome: 'Rua de Carros',
@@ -172,7 +178,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [SEX]: ['Post'] },
     briefing:
       'Loja multimarcas de veículos, comunicação comercial e orientada à venda. O conteúdo mistura oferta agressiva, condições comerciais e destaque para os veículos.',
-    nota: 'Os posts são de veículos, usando os carros que o cliente manda no grupo. Fee, dia de vencimento e forma de pagamento ainda não foram informados.',
+    nota: 'Os posts são de veículos, usando os carros que o cliente manda no grupo. Fee, dia de vencimento e forma de pagamento ainda não foram informados. Pesquisa pública em agosto de 2026 não confirmou uma loja "Rua de Carros" específica na região — manter esse briefing como está até confirmar com o cliente.',
   },
   {
     nome: 'Grupo 3D Empreendimentos',
@@ -181,6 +187,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
       'Grupo imobiliário com atuação integrada em gestão, locação, engenharia, design, reformas e valorização de patrimônio. Identidade premium, clean e sofisticada: azul-petróleo, grafite, slate, cinza e branco, com pouca poluição visual. A comunicação transmite autoridade e segurança para proprietários e investidores, e busca captar imóveis para gestão e locação.',
+    nota: 'Pesquisa pública em agosto de 2026 não confirmou o "Grupo 3D Empreendimentos" especificamente em Barra Mansa — manter esse briefing (já detalhado a partir do operacional real) como está até checagem com o cliente.',
   },
   {
     nome: 'Concreblocos & Lajes',
@@ -191,6 +198,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUI]: ['Post'] },
     briefing:
       'Construção civil: lajes, pré-moldados e soluções estruturais para obra. Azul royal, amarelo e laranja, branco, com prioridade para foto real, headline forte e linguagem profissional acessível. O conteúdo mistura obras realizadas, bastidores, orientação técnica, logística, autoridade e campanhas comerciais regionais.',
+    nota: 'Pesquisa pública em agosto de 2026 não confirmou a "Concreblocos & Lajes" especificamente (há outros fabricantes de laje pré-moldada na região, não confundir) — manter esse briefing como está até checagem com o cliente.',
   },
   {
     nome: 'Dra. Elba Ferrão',
@@ -199,7 +207,8 @@ const CARTEIRA: Entrada[] = [
     area: 'cidade',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Foto'] },
     briefing:
-      'Médica oftalmologista, comunicação educativa, elegante, baseada em prevenção e cuidado com a visão. Identidade delicada e premium: branco, bege, rosé e coral, com imagens humanas ou elementos ligados aos olhos e à visão. Pautas: sintomas, curiosidades, novas tecnologias da oftalmologia, prevenção, exames e assuntos que despertam curiosidade.',
+      'Médica oftalmologista, Clínica de Olhos Dra. Elba Ferrão. Endereço: Avenida Joaquim Leite, 396, Centro, Barra Mansa/RJ. Comunicação educativa, elegante, baseada em prevenção e cuidado com a visão. Identidade delicada e premium: branco, bege, rosé e coral, com imagens humanas ou elementos ligados aos olhos e à visão. Pautas: sintomas, curiosidades, novas tecnologias da oftalmologia, prevenção, exames e assuntos que despertam curiosidade.',
+    nota: 'Endereço confirmado por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'Dra. Lara',
@@ -209,6 +218,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
       'Odontologia com posicionamento em atendimento humano, acolhimento e confiança. Visual minimalista, elegante e profissional, com prioridade para fotos reais da própria profissional e layouts com bastante respiro. A comunicação aproxima paciente e dentista: cuidado, escuta, segurança e experiência no atendimento.',
+    nota: 'Pesquisa pública em agosto de 2026 não confirmou "Dra. Lara" com esse nome exato entre os dentistas listados na região (provavelmente forma curta/apelido usado internamente) — manter esse briefing como está até confirmar nome completo e endereço com o cliente.',
   },
   {
     nome: 'Sicomércio Barra Mansa',
@@ -218,7 +228,8 @@ const CARTEIRA: Entrada[] = [
     cidades: ['Barra Mansa'],
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
-      'Entidade representativa do comércio de Barra Mansa, comunicação institucional voltada aos comerciantes e à valorização da economia local. Linha profissional e institucional, que pode ganhar tom mais comercial em campanhas promocionais. Trabalhamos datas comemorativas, ações como Amor Premiado e mensagens incentivando o consumidor a prestigiar o comércio da cidade.',
+      'Sindicato do Comércio Varejista de Barra Mansa, Porto Real, Quatis e Rio Claro. Sede: Rua José Maria da Cruz, 55, Sala 204, Centro, Barra Mansa/RJ. Entidade representativa do comércio da região, comunicação institucional voltada aos comerciantes e à valorização da economia local, com atuação em convenções coletivas e pauta salarial da categoria (piso do comércio). Linha profissional e institucional, que pode ganhar tom mais comercial em campanhas promocionais. Trabalhamos datas comemorativas, ações promocionais sazonais (tipo Natal Premiado, Show de Prêmios das Mães) e mensagens incentivando o consumidor a prestigiar o comércio da cidade.',
+    nota: 'Endereço, abrangência regional (4 municípios) e exemplos de campanha confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'BT Veículos',
@@ -228,7 +239,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
       'Loja de veículos com campanhas comerciais ligadas a feirões e condições especiais de financiamento. Visual automotivo, forte e promocional, com os carros em destaque, chamada objetiva e benefício claro. Campanhas já feitas: desconto no pátio, transferência, tanque cheio, datas especiais e ações em parceria com financiamento.',
-    nota: 'Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo.',
+    nota: 'Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo. Pesquisa pública em agosto de 2026 não confirmou "BT Veículos" com esse nome exato (encontrado apenas negócios de nome parecido, como "B M Veículos", não confundir) — manter esse briefing como está até checagem com o cliente.',
   },
   {
     nome: 'Kbral Park',
@@ -237,8 +248,8 @@ const CARTEIRA: Entrada[] = [
     area: 'regiao',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Foto'], [SEX]: ['Foto'] },
     briefing:
-      'Entretenimento infantil e familiar: experiências, festas, brinquedos, crianças e alimentação. A comunicação precisa transmitir diversão de forma real, mostrando crianças usando o espaço e famílias aproveitando o ambiente. A produção prioriza criança brincando, comida pronta, momento em família e cena espontânea que mostre a experiência. Conferir os perfis no Instagram antes de cada planejamento, para acompanhar atrações e novidades da temporada.',
-    nota: 'As duas entregas semanais são fotos, não artes.',
+      'Buffet infantil para festas, único no formato buffet completo para eventos infantis da região. Endereço: Rua Gustavo Lira, 273, São João, Volta Redonda/RJ. Espaço centralizado e seguro, pensado para festas de aniversário e eventos em família. Entretenimento infantil e familiar: experiências, festas, brinquedos, crianças e alimentação. A comunicação precisa transmitir diversão de forma real, mostrando crianças usando o espaço e famílias aproveitando o ambiente. A produção prioriza criança brincando, comida pronta, momento em família e cena espontânea que mostre a experiência. Conferir os perfis no Instagram antes de cada planejamento, para acompanhar atrações e novidades da temporada.',
+    nota: 'As duas entregas semanais são fotos, não artes. Endereço e posicionamento (único buffet do formato na região) confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'Kbral Kids',
@@ -247,8 +258,8 @@ const CARTEIRA: Entrada[] = [
     fee: 1000, dia: 5, forma: 'pix', pagador: 'SUKIO HIGO',
     cadencia: {},
     briefing:
-      'Entretenimento infantil da mesma família do Kbral Park, faturado separado. A comunicação mostra crianças usando o espaço e famílias aproveitando o ambiente, com cenas espontâneas e comida pronta. Conferir o Instagram antes de cada planejamento, para acompanhar atrações e novidades da temporada.',
-    nota: 'Entrega combinada junto com o Kbral Park.',
+      'Restaurante infantil da mesma família do Kbral Park, faturado separado. Endereço: Rua João Valiante, 89, Ano Bom, Barra Mansa/RJ. Cardápio com pizzas e hambúrgueres artesanais, ambiente pensado para famílias com monitoria, recreação infantil, pintura facial, piscina de bolinhas, escorregador, cesta de basquete, videogames e vila kids, além de motinhas elétricas. A comunicação mostra crianças usando o espaço e famílias aproveitando o ambiente, com cenas espontâneas e comida pronta. Conferir o Instagram antes de cada planejamento, para acompanhar atrações e novidades da temporada.',
+    nota: 'Entrega combinada junto com o Kbral Park. Endereço e estrutura do espaço confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'Mastermax Contabilidade',
@@ -257,7 +268,8 @@ const CARTEIRA: Entrada[] = [
     area: 'regiao',
     cadencia: { [TER]: ['Vídeo'], [QUA]: ['Post'], [SEX]: ['Post'] },
     briefing:
-      'Escritório de contabilidade com comunicação educativa e estratégica para empresas, empreendedores, MEIs e pessoas com CNPJ. Visual profissional e corporativo. O conteúdo precisa simplificar assunto complexo sem perder autoridade. Pautas: CNPJ, MEI, tributação, Reforma Tributária, erros fiscais, suspensão de empresas e decisões importantes para o empresário.',
+      'Escritório de contabilidade em atuação desde 2008, com equipe de médio porte (entre 51 e 200 colaboradores) e atendimento em modelo de procedimentos automatizados. Endereço: Rua Prefeito Mário Pinto dos Reis, 51, Barra Mansa/RJ. Além da contabilidade tradicional, oferece consultoria e estruturação de holding familiar para proteção patrimonial e planejamento sucessório. Comunicação educativa e estratégica para empresas, empreendedores, MEIs e pessoas com CNPJ. Visual profissional e corporativo. O conteúdo precisa simplificar assunto complexo sem perder autoridade. Pautas: CNPJ, MEI, tributação, Reforma Tributária, erros fiscais, suspensão de empresas, holding familiar e decisões importantes para o empresário.',
+    nota: 'Endereço, porte e serviço de holding familiar confirmados por pesquisa pública em agosto de 2026.',
   },
   {
     nome: 'Mega Móveis',
@@ -266,7 +278,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: {},
     briefing:
       'Loja de móveis com posicionamento muito comercial e popular, baseado em oferta, condição de pagamento e grandes campanhas promocionais. A identidade das ofertas usa roxo, magenta, laranja e amarelo, com produto grande e hierarquia forte para preço e parcelamento. Campanhas como Aniversário da Patroa, ofertas especiais, datas comemorativas e peças diretas para venda imediata.',
-    nota: 'Sem cadência fixa. As demandas chegam pelo grupo e entram como avulsas, então este cliente fica de fora do planejamento automático.',
+    nota: 'Sem cadência fixa. As demandas chegam pelo grupo e entram como avulsas, então este cliente fica de fora do planejamento automático. Pesquisa pública em agosto de 2026 não confirmou dado adicional específico sobre a loja — manter esse briefing como está.',
   },
   {
     nome: 'Barra Travel',
@@ -276,6 +288,7 @@ const CARTEIRA: Entrada[] = [
     cadencia: { [TER]: ['Vídeo'], [QUI]: ['Post'] },
     briefing:
       'Agência de viagens com pacotes nacionais e internacionais, hospedagem, passagem e experiências. A comunicação valoriza visualmente o destino, mantendo aparência profissional e aspiracional, com a informação comercial bem organizada. Produzimos divulgação de pacotes completos, condições de parcelamento, campanhas sazonais e destinos como Chile e Nova York.',
+    nota: 'Pesquisa pública em agosto de 2026 não confirmou "Barra Travel" com esse nome exato entre as agências de turismo listadas em Barra Mansa — manter esse briefing como está até checagem com o cliente.',
   },
   {
     nome: 'Camisaria Pinguim',
@@ -284,8 +297,8 @@ const CARTEIRA: Entrada[] = [
     area: 'cidade',
     cadencia: { [TER]: ['Vídeo'], [QUI]: ['Foto'] },
     briefing:
-      'Camisaria masculina com mix que inclui moda, ternos, carteiras, garrafas, bolsas, mochilas, malas, nécessaires e pastas. Comunicação comercial: valorizar produto, variedade, preço e oportunidade de compra sem sobrecarregar o layout. Conteúdos de vídeo de produto, campanhas de moda e ofertas, como ternos a partir de R$ 495.',
-    nota: 'A entrega semanal costuma ser foto, não arte.',
+      'Camisaria masculina em operação desde 1970 — mais de 50 anos de história no Centro de Barra Mansa. Endereço: Avenida Joaquim Leite, Centro, Barra Mansa/RJ. Mix que inclui moda, ternos, carteiras, garrafas, bolsas, mochilas, malas, nécessaires e pastas. Comunicação comercial: valorizar produto, variedade, preço e oportunidade de compra sem sobrecarregar o layout — a tradição de décadas na cidade é um argumento de confiança a explorar. Conteúdos de vídeo de produto, campanhas de moda e ofertas, como ternos a partir de R$ 495.',
+    nota: 'A entrega semanal costuma ser foto, não arte. Fundação (1970) e endereço confirmados por pesquisa pública em agosto de 2026.',
   },
 ];
 
@@ -357,3 +370,38 @@ export function seedData(): WorkspaceData {
     campaigns: [],
   };
 }
+
+/**
+ * Snapshot do briefing (texto + observação de operação) de cada cliente
+ * ANTES da rodada de pesquisa pública de agosto de 2026. Serve só pra
+ * `restoreBriefings` (dataStore) saber quando o briefing salvo de alguém
+ * ainda é o antigo "de fábrica" — aí pode trocar com segurança pelo texto
+ * pesquisado, sem nunca sobrescrever um briefing que a equipe já editou na
+ * tela.
+ */
+export const OLD_BRIEFINGS: Record<string, string> = {
+  'Banco Omni': 'Financeira focada em financiamento e refinanciamento de carros, motos e caminhões, com mais de 30 anos e presença em mais de 100 cidades. Trabalha por uma rede de Agentes Omni, correspondentes bancários espalhados pelo Brasil: o mesmo conteúdo serve para todos os agentes, e só feirões e ações locais pedem peça exclusiva. Comunicação popular, comercial e voltada à conversão. Azul royal, branco e laranja, com veículos, pessoas reais, movimento e headlines curtas de grande impacto. Pautas recorrentes: feirões, ações em loja, refinanciamento, Plano Renova, campanhas sazonais e material para correspondentes e lojistas.\n\nCombinado de operação: Conteúdo único para todos os agentes. Os agentes ficam em praças diferentes, inclusive em outros estados, então feirão e ação local entram como peça extra com a cidade daquele agente.',
+  'Vidroscar': 'Para-brisas, vidros automotivos, insulfilm e higienização e manutenção de ar-condicionado automotivo. Visual moderno e técnico: azul escuro, azul claro e ciano, laranja pontual, carros valorizados e estética limpa, sem aparência artificial. O conteúdo parte de problemas reais do motorista: vidro trincado ou quebrado, segurança, insulfilm, ar-condicionado. Objetivo principal é gerar contato.',
+  'Rede de Postos Margarida': 'Rede de postos de combustíveis com comunicação popular, próxima, voltada ao motorista e à família. Verde vibrante, amarelo e branco, com vermelho nos preços; campanhas específicas podem ganhar um tratamento mais premium. Destaques: qualidade dos combustíveis, economia, confiança, estrada e o diferencial do Diesel S10 aditivado.\n\nCombinado de operação: Segunda é o post da Terça da Sorte, a promoção da rede. Antes de produzir, perguntar ao cliente o valor da semana. Quarta e sexta alternam vídeo e post.',
+  'Carpintaria Meirelles': 'Carpintaria e marcenaria, principalmente portas, janelas e projetos sob medida. Identidade sofisticada e artesanal: verde escuro e petróleo, verde turquesa, branco e tons naturais de madeira. A comunicação valoriza acabamento, qualidade, tradição, trabalho bem-feito, personalização e o cuidado de cada projeto.',
+  'Barra Escap Autocenter': 'Centro automotivo: escapamento, pneus, óleo, alinhamento, balanceamento, suspensão, freios e manutenção preventiva. Alto impacto em preto e grafite, amarelo e dourado, branco, com referências a asfalto, pneu, metal e oficina. O conteúdo mistura oferta agressiva, diagnóstico de problema, educação automotiva e chamada direta para levar o veículo à oficina.',
+  'Start Car': 'Loja multimarcas de veículos, comunicação jovem, comercial e orientada à venda. Azul escuro, branco e amarelo, com mascote presente e grande destaque para os veículos e as condições comerciais. Campanhas de oferta, aniversário da loja, oportunidades especiais, datas comemorativas e argumentos para acelerar a decisão de compra.\n\nCombinado de operação: Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo.',
+  'RPM Veículos': 'Segmento automotivo, vendas e campanhas com carros e motos. Azul royal, branco e ciano, veículos em cenário urbano ou rodoviário, comunicação dinâmica. Além do comercial, produzimos campanhas internas de metas, premiações, vouchers e peças comemorativas.\n\nCombinado de operação: Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo.',
+  'Connecta Telesaúde Digital': 'Telemedicina com consultas online, proposta de tornar o atendimento médico acessível e prático. Identidade clara e moderna: branco, azul e turquesa, verde-limão e azul escuro, com médicos, pacientes e celulares. A comunicação destaca atendimento online, praticidade, preço acessível, disponibilidade 24h e os benefícios dos planos individuais e empresariais.',
+  'AH-I Entertainment': 'Provedor de internet com posicionamento jovem e tecnológico, ligado a games, streaming, conectividade e vida digital. Estética tech e gamer: base escura, ciano, azul, amarelo e toques neon, com as peças sempre iluminadas e modernas. Pautas: estabilidade, velocidade, Wi-Fi, vários dispositivos ao mesmo tempo, situações do dia a dia e motivos para trocar de provedor.',
+  'Nascimento & Nascimento Advogados': 'Escritório jurídico tradicional, cerca de 40 anos de atuação, forte em direito previdenciário e causas de servidores. Identidade premium e institucional: azul-petróleo escuro, branco e detalhes dourados e bege. Pautas: INSS, aposentadoria, professores, piso do magistério, paridade, imposto de renda, benefícios negados e direitos pouco conhecidos.',
+  'Sterna Café Barra Mansa': 'Unidade local da rede Sterna Café, franquia de cafeteria especializada em café especial brasileiro (grãos 100% especiais de várias regiões, métodos de extração internacionais). Cardápio variado: cafés quentes e gelados, massas, refeições, saladas, sanduíches, salgados e sobremesas. Identidade da marca remete à ave sterna, a que mais viaja no mundo — conceito de experiência, cada xícara como uma descoberta. Comunicação deve valorizar o preparo, o ambiente e o produto com foto real.\n\nCombinado de operação: Fee, vencimento e forma de pagamento vieram do controle financeiro; briefing e identidade vieram de pesquisa pública (site e Instagram da marca). Cadência ainda não foi confirmada pelo cliente.',
+  'Rua de Carros': 'Loja multimarcas de veículos, comunicação comercial e orientada à venda. O conteúdo mistura oferta agressiva, condições comerciais e destaque para os veículos.\n\nCombinado de operação: Os posts são de veículos, usando os carros que o cliente manda no grupo. Fee, dia de vencimento e forma de pagamento ainda não foram informados.',
+  'Grupo 3D Empreendimentos': 'Grupo imobiliário com atuação integrada em gestão, locação, engenharia, design, reformas e valorização de patrimônio. Identidade premium, clean e sofisticada: azul-petróleo, grafite, slate, cinza e branco, com pouca poluição visual. A comunicação transmite autoridade e segurança para proprietários e investidores, e busca captar imóveis para gestão e locação.',
+  'Concreblocos & Lajes': 'Construção civil: lajes, pré-moldados e soluções estruturais para obra. Azul royal, amarelo e laranja, branco, com prioridade para foto real, headline forte e linguagem profissional acessível. O conteúdo mistura obras realizadas, bastidores, orientação técnica, logística, autoridade e campanhas comerciais regionais.',
+  'Dra. Elba Ferrão': 'Médica oftalmologista, comunicação educativa, elegante, baseada em prevenção e cuidado com a visão. Identidade delicada e premium: branco, bege, rosé e coral, com imagens humanas ou elementos ligados aos olhos e à visão. Pautas: sintomas, curiosidades, novas tecnologias da oftalmologia, prevenção, exames e assuntos que despertam curiosidade.',
+  'Dra. Lara': 'Odontologia com posicionamento em atendimento humano, acolhimento e confiança. Visual minimalista, elegante e profissional, com prioridade para fotos reais da própria profissional e layouts com bastante respiro. A comunicação aproxima paciente e dentista: cuidado, escuta, segurança e experiência no atendimento.',
+  'Sicomércio Barra Mansa': 'Entidade representativa do comércio de Barra Mansa, comunicação institucional voltada aos comerciantes e à valorização da economia local. Linha profissional e institucional, que pode ganhar tom mais comercial em campanhas promocionais. Trabalhamos datas comemorativas, ações como Amor Premiado e mensagens incentivando o consumidor a prestigiar o comércio da cidade.',
+  'BT Veículos': 'Loja de veículos com campanhas comerciais ligadas a feirões e condições especiais de financiamento. Visual automotivo, forte e promocional, com os carros em destaque, chamada objetiva e benefício claro. Campanhas já feitas: desconto no pátio, transferência, tanque cheio, datas especiais e ações em parceria com financiamento.\n\nCombinado de operação: Os dois posts da semana são de veículos, usando os carros que o cliente manda no grupo.',
+  'Kbral Park': 'Entretenimento infantil e familiar: experiências, festas, brinquedos, crianças e alimentação. A comunicação precisa transmitir diversão de forma real, mostrando crianças usando o espaço e famílias aproveitando o ambiente. A produção prioriza criança brincando, comida pronta, momento em família e cena espontânea que mostre a experiência. Conferir os perfis no Instagram antes de cada planejamento, para acompanhar atrações e novidades da temporada.\n\nCombinado de operação: As duas entregas semanais são fotos, não artes.',
+  'Kbral Kids': 'Entretenimento infantil da mesma família do Kbral Park, faturado separado. A comunicação mostra crianças usando o espaço e famílias aproveitando o ambiente, com cenas espontâneas e comida pronta. Conferir o Instagram antes de cada planejamento, para acompanhar atrações e novidades da temporada.\n\nCombinado de operação: Entrega combinada junto com o Kbral Park.',
+  'Mastermax Contabilidade': 'Escritório de contabilidade com comunicação educativa e estratégica para empresas, empreendedores, MEIs e pessoas com CNPJ. Visual profissional e corporativo. O conteúdo precisa simplificar assunto complexo sem perder autoridade. Pautas: CNPJ, MEI, tributação, Reforma Tributária, erros fiscais, suspensão de empresas e decisões importantes para o empresário.',
+  'Mega Móveis': 'Loja de móveis com posicionamento muito comercial e popular, baseado em oferta, condição de pagamento e grandes campanhas promocionais. A identidade das ofertas usa roxo, magenta, laranja e amarelo, com produto grande e hierarquia forte para preço e parcelamento. Campanhas como Aniversário da Patroa, ofertas especiais, datas comemorativas e peças diretas para venda imediata.\n\nCombinado de operação: Sem cadência fixa. As demandas chegam pelo grupo e entram como avulsas, então este cliente fica de fora do planejamento automático.',
+  'Barra Travel': 'Agência de viagens com pacotes nacionais e internacionais, hospedagem, passagem e experiências. A comunicação valoriza visualmente o destino, mantendo aparência profissional e aspiracional, com a informação comercial bem organizada. Produzimos divulgação de pacotes completos, condições de parcelamento, campanhas sazonais e destinos como Chile e Nova York.',
+  'Camisaria Pinguim': 'Camisaria masculina com mix que inclui moda, ternos, carteiras, garrafas, bolsas, mochilas, malas, nécessaires e pastas. Comunicação comercial: valorizar produto, variedade, preço e oportunidade de compra sem sobrecarregar o layout. Conteúdos de vídeo de produto, campanhas de moda e ofertas, como ternos a partir de R$ 495.\n\nCombinado de operação: A entrega semanal costuma ser foto, não arte.',
+};

@@ -20,7 +20,7 @@ import type {
   VideoStage,
 } from './types';
 import { uid, acharPorNome } from './utils';
-import { seedData } from './seed';
+import { seedData, OLD_BRIEFINGS } from './seed';
 
 interface DataState {
   clients: Client[];
@@ -57,6 +57,14 @@ interface DataState {
    * o que já foi preenchido na tela (grupo, WhatsApp de cobrança, documento).
    */
   restoreBillingFields: () => number;
+  /**
+   * Atualiza o briefing de quem ainda está com a versão antiga (igual ao
+   * que já veio pronto de fábrica), trazendo pesquisa nova feita sobre os
+   * clientes reais. Nunca mexe em briefing que a equipe já editou na tela —
+   * só troca quando o texto atual é idêntico ao briefing anterior salvo em
+   * código, senão ficaria sobrescrevendo edição manual de alguém.
+   */
+  restoreBriefings: () => number;
   resetAll: () => void;
 
   // Clientes
@@ -189,6 +197,24 @@ export const useData = create<DataState>()(
           }),
         }));
         return corrigidos;
+      },
+      restoreBriefings: () => {
+        const seedClients = seedData().clients;
+        let atualizados = 0;
+        set((s) => ({
+          clients: s.clients.map((c) => {
+            const base = acharPorNome(c.name, seedClients, (sc) => sc.name);
+            if (!base || !base.briefing) return c;
+            // Só troca se o briefing salvo ainda é idêntico ao "de fábrica"
+            // antigo — se a equipe já editou na tela, ou já está com a
+            // pesquisa nova, não mexe.
+            const antigo = OLD_BRIEFINGS[c.name];
+            if (antigo === undefined || c.briefing !== antigo || c.briefing === base.briefing) return c;
+            atualizados++;
+            return { ...c, briefing: base.briefing };
+          }),
+        }));
+        return atualizados;
       },
       resetAll: () => set({ ...empty, seeded: true }),
 
