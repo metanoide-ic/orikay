@@ -199,3 +199,64 @@ export async function generateCopy(post: Post, client?: Client): Promise<string>
     return templateCopy(post, client) + `\n\n— (gerado localmente; IA indisponível: ${(e as Error).message})`;
   }
 }
+
+/**
+ * Ferramentas expostas pra IA no formato "function calling" compatível com
+ * OpenAI. `parameters` é um JSON Schema simples (o suficiente pro modelo
+ * saber o que preencher).
+ */
+export interface AiTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface AiChatMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
+  tool_call_id?: string;
+  name?: string;
+}
+
+/**
+ * Um passo da conversa com a IA Helper: manda o histórico + as ferramentas
+ * disponíveis, devolve a resposta do modelo — que pode ser texto final ou um
+ * pedido pra chamar uma ou mais ferramentas (`tool_calls`). Quem chama decide
+ * o que fazer com cada chamada (a IA Helper executa e chama de novo em
+ * loop; ferramentas sensíveis pausam pra confirmação antes de rodar).
+ *
+ * Precisa de uma chave de IA configurada com suporte a function calling
+ * (Groq com Llama 3.3/3.1 funciona bem). Sem IA configurada, lança erro —
+ * quem chama trata e avisa o usuário, já que aqui não existe fallback local
+ * sensato pra "executar ações".
+ */
+export async function chatStep(messages: AiChatMessage[], tools: AiTool[]): Promise<AiChatMessage> {
+  const s = useSettings.getState();
+  if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) {
+    throw new Error('Configure uma chave de IA em Ajustes (com suporte a function calling) pra usar a IA Helper.');
+  }
+  const res = await fetch(s.aiEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.aiKey}` },
+    body: JSON.stringify({
+      model: s.aiModel,
+      messages,
+      tools,
+      tool_choice: 'auto',
+      temperature: 0.4,
+      max_tokens: 1200,
+    }),
+  });
+  if (!res.ok) {
+    const texto = await res.text().catch(() => '');
+    throw new Error(`IA respondeu ${res.status}: ${texto.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const msg = data?.choices?.[0]?.message;
+  if (!msg) throw new Error('Resposta vazia da IA.');
+  return { role: 'assistant', content: msg.content ?? null, tool_calls: msg.tool_calls };
+}

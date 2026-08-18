@@ -85,6 +85,20 @@ function registrar(tipo, texto, ok = true) {
   console.log(`[${marca}] ${tipo}: ${texto}`);
 }
 
+/**
+ * Caixa de entrada crua do WhatsApp: toda mensagem de grupo que chega,
+ * independente de virar decisão ou não, fica guardada aqui — é o que a IA
+ * Helper da plataforma lê quando o admin pede pra ver o que os clientes
+ * mandaram. Não apaga sozinha (diferente de `decisoes`, que é consumida
+ * uma vez): fica só um limite de tamanho, as mais antigas saem.
+ */
+const mensagensRecebidas = [];
+function guardarMensagem(grupo, texto) {
+  if (!texto) return;
+  mensagensRecebidas.unshift({ grupo, texto: String(texto).slice(0, 2000), quando: Date.now() });
+  mensagensRecebidas.length = Math.min(mensagensRecebidas.length, 300);
+}
+
 /* ------------------------------ WhatsApp ------------------------------ */
 
 function whatsappConfigurado() {
@@ -648,6 +662,7 @@ function lerMensagem(corpo) {
 async function receberMensagem(corpo) {
   const msg = lerMensagem(corpo);
   if (!msg || msg.minha) return null;
+  guardarMensagem(msg.grupo, msg.texto);
 
   // Pergunta sobre cobrança (valor, vencimento, Pix): responde sozinho na
   // hora, sem precisar de fila nem de post esperando aprovação. Só entra
@@ -1022,6 +1037,21 @@ const servidor = createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, resultado }));
+  }
+
+  // A IA Helper (só admin) lê aqui as mensagens cruas recebidas no WhatsApp
+  // — diferente de /decisoes, não consome: pode reler quantas vezes quiser.
+  // ?desde=<timestamp ms> filtra só o que chegou depois; ?grupo= filtra por
+  // grupo/número específico; ?limite= corta o tamanho da resposta.
+  if (url.pathname === '/mensagens') {
+    const desde = Number(url.searchParams.get('desde') || 0);
+    const grupo = url.searchParams.get('grupo');
+    const limite = Math.min(Number(url.searchParams.get('limite') || 100), 300);
+    let lista = mensagensRecebidas;
+    if (desde) lista = lista.filter((m) => m.quando > desde);
+    if (grupo) lista = lista.filter((m) => m.grupo === grupo || soDigitos(m.grupo) === soDigitos(grupo));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, mensagens: lista.slice(0, limite) }));
   }
 
   // A plataforma busca aqui as respostas já entendidas.

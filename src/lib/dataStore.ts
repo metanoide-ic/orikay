@@ -98,7 +98,7 @@ interface DataState {
   removeTx: (id: string) => void;
 
   // Posts
-  addPost: (p: Omit<Post, 'id' | 'createdAt' | 'checklist' | 'revisions'> & { checklist?: Post['checklist'] }) => void;
+  addPost: (p: Omit<Post, 'id' | 'createdAt' | 'checklist' | 'revisions'> & { checklist?: Post['checklist'] }) => Post;
   updatePost: (id: string, patch: Partial<Post>) => void;
   setPostStage: (id: string, stage: PostStage) => void;
   movePost: (postId: string, toStage: PostStage, toIndex: number) => void;
@@ -378,13 +378,11 @@ export const useData = create<DataState>()(
         set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) })),
 
       // ---------- Posts ----------
-      addPost: (p) =>
-        set((s) => ({
-          posts: [
-            { ...p, id: uid('post'), createdAt: Date.now(), checklist: p.checklist ?? [], revisions: [] },
-            ...s.posts,
-          ],
-        })),
+      addPost: (p) => {
+        const post: Post = { ...p, id: uid('post'), createdAt: Date.now(), checklist: p.checklist ?? [], revisions: [] };
+        set((s) => ({ posts: [post, ...s.posts] }));
+        return post;
+      },
       updatePost: (id, patch) =>
         set((s) => ({
           posts: s.posts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
