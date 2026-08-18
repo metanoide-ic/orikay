@@ -12,11 +12,12 @@ import { hash, pickColor, uid } from './utils';
  * cada um a definir a sua antes de liberar qualquer tela.
  */
 const TEAM: Array<Omit<Account, 'id' | 'color' | 'createdAt'>> = [
-  { name: 'Daniel Designer', login: 'Daniel Designer', role: 'Designer', canFinance: false, admin: false, passHash: 'ce2bcb07' },
-  { name: 'Jr Social Media', login: 'Jr Social Media', role: 'Social Media', canFinance: false, admin: false, passHash: '2dec3f8e' },
-  { name: 'Angélica Leal', login: 'Angélica Leal', role: 'Direção', canFinance: true, admin: true, passHash: '5949d785' },
-  { name: 'João Paulo', login: 'João Paulo', role: 'Direção', canFinance: true, admin: true, passHash: 'f742817a' },
-  { name: 'Luiz Paulo SM', login: 'Luiz Paulo SM', role: 'Social Media', canFinance: false, admin: false, passHash: 'fee4eeb' },
+  { name: 'Daniel Designer', login: 'danieldesigner', role: 'Designer', canFinance: false, admin: false, passHash: '8ce0d6d9' },
+  { name: 'Jr Social Media', login: 'jrfilhodejr', role: 'Social Media', canFinance: false, admin: false, passHash: '5531f19' },
+  { name: 'Angélica Leal', login: 'angelicaleal', role: 'Direção', canFinance: true, admin: true, passHash: '582e7fc9' },
+  { name: 'João Paulo', login: 'joaopauloleal', role: 'Direção', canFinance: true, admin: true, passHash: '582e7fc9' },
+  { name: 'Luiz Paulo SM', login: 'luizpaulodacu', role: 'Social Media', canFinance: false, admin: false, passHash: '9cfd561a' },
+  { name: 'Leandro Filmmaker', login: 'leandrofilmmaker', role: 'Filmmaker', canFinance: false, admin: false, passHash: '1695bbde' },
 ];
 
 function norm(s: string) {
