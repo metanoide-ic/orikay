@@ -205,11 +205,11 @@ export const useData = create<DataState>()(
           clients: s.clients.map((c) => {
             const base = acharPorNome(c.name, seedClients, (sc) => sc.name);
             if (!base || !base.briefing) return c;
-            // Só troca se o briefing salvo ainda é idêntico ao "de fábrica"
-            // antigo — se a equipe já editou na tela, ou já está com a
-            // pesquisa nova, não mexe.
-            const antigo = OLD_BRIEFINGS[c.name];
-            if (antigo === undefined || c.briefing !== antigo || c.briefing === base.briefing) return c;
+            // Só troca se o briefing salvo ainda bate com uma das versões
+            // "de fábrica" de rodadas anteriores — se a equipe já editou na
+            // tela, ou já está com a pesquisa mais nova, não mexe.
+            const antigos = OLD_BRIEFINGS[c.name];
+            if (!antigos || c.briefing === undefined || !antigos.includes(c.briefing) || c.briefing === base.briefing) return c;
             atualizados++;
             return { ...c, briefing: base.briefing };
           }),
