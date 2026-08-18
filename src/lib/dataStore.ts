@@ -22,6 +22,9 @@ import type {
 import { uid, acharPorNome, normalizarNome } from './utils';
 import { seedData, OLD_BRIEFINGS } from './seed';
 
+/** Todo tipo de registro que participa da sincronização com o Conector. */
+type TipoRegistro = 'post' | 'video' | 'cliente' | 'transacao' | 'cobranca' | 'biblioteca' | 'campanha';
+
 interface DataState {
   clients: Client[];
   boards: Board[];
@@ -150,7 +153,7 @@ interface DataState {
    * "ressuscitar" quando outro dispositivo, que ainda tem ele localmente,
    * manda de volta na próxima sincronização.
    */
-  tombstones: Array<{ tipo: 'post' | 'video' | 'cliente'; id: string; quando: number }>;
+  tombstones: Array<{ tipo: TipoRegistro; id: string; quando: number }>;
   /**
    * Aplica o estado que veio do Conector (já mesclado lá com o de todo
    * mundo): registro por registro, ganha quem tiver o `updatedAt` mais
@@ -165,16 +168,20 @@ const empty = {
   videos: [], library: [], events: [], charges: [], campaigns: [],
   angleMemory: {} as Record<string, { foto: number[]; video: number[] }>,
   checklistExtras: {} as Record<string, ChecklistItem[]>,
-  tombstones: [] as Array<{ tipo: 'post' | 'video' | 'cliente'; id: string; quando: number }>,
+  tombstones: [] as Array<{ tipo: TipoRegistro; id: string; quando: number }>,
 };
 
-/** Formato trocado com o Conector pra sincronizar clientes/posts/vídeos entre a equipe. */
+/** Formato trocado com o Conector pra sincronizar a plataforma inteira entre a equipe. */
 export interface RemoteSyncData {
   clients: Client[];
   posts: Post[];
   videos: VideoProject[];
+  transactions: Transaction[];
+  charges: Charge[];
+  library: LibraryItem[];
+  campaigns: Campaign[];
   checklistExtras: Record<string, ChecklistItem[]>;
-  tombstones: Array<{ tipo: 'post' | 'video' | 'cliente'; id: string; quando: number }>;
+  tombstones: Array<{ tipo: TipoRegistro; id: string; quando: number }>;
 }
 
 /** Mescla um registro só (por id) com o remoto: fica quem tem updatedAt mais novo. Sem updatedAt em nenhum dos dois, o local prevalece (evita sumir dado antigo). */
@@ -200,7 +207,14 @@ function deduplicarClientesPorNome(
   clients: Client[],
   posts: Post[],
   videos: VideoProject[],
-): { clients: Client[]; posts: Post[]; videos: VideoProject[]; excluidos: Array<{ tipo: 'cliente'; id: string; quando: number }> } {
+  transactions: Transaction[],
+  charges: Charge[],
+  campaigns: Campaign[],
+): {
+  clients: Client[]; posts: Post[]; videos: VideoProject[];
+  transactions: Transaction[]; charges: Charge[]; campaigns: Campaign[];
+  excluidos: Array<{ tipo: 'cliente'; id: string; quando: number }>;
+} {
   const grupos = new Map<string, Client[]>();
   for (const c of clients) {
     const chave = normalizarNome(c.name);
@@ -234,15 +248,18 @@ function deduplicarClientesPorNome(
     canonicos.push(mesclado);
   }
 
-  if (remap.size === 0) return { clients, posts, videos, excluidos: [] };
+  if (remap.size === 0) return { clients, posts, videos, transactions, charges, campaigns, excluidos: [] };
+  // Bumpa updatedAt junto: sem isso, o remapeamento só convence os outros
+  // dispositivos na próxima vez que alguém mexer de verdade nesse
+  // registro — com timestamp igual ao que o servidor já tem, a mesclagem
+  // por "quem é mais novo" não teria motivo pra propagar a correção.
   return {
     clients: canonicos,
-    // Bumpa updatedAt junto: sem isso, o remapeamento só convence os outros
-    // dispositivos na próxima vez que alguém mexer de verdade nesse post/
-    // vídeo — com timestamp igual ao que o servidor já tem, a mesclagem por
-    // "quem é mais novo" não teria motivo pra propagar a correção.
     posts: posts.map((p) => (p.clientId && remap.has(p.clientId) ? { ...p, clientId: remap.get(p.clientId), updatedAt: Date.now() } : p)),
     videos: videos.map((v) => (v.clientId && remap.has(v.clientId) ? { ...v, clientId: remap.get(v.clientId), updatedAt: Date.now() } : v)),
+    transactions: transactions.map((t) => (t.clientId && remap.has(t.clientId) ? { ...t, clientId: remap.get(t.clientId), updatedAt: Date.now() } : t)),
+    charges: charges.map((c) => (remap.has(c.clientId) ? { ...c, clientId: remap.get(c.clientId)!, updatedAt: Date.now() } : c)),
+    campaigns: campaigns.map((c) => (c.clientId && remap.has(c.clientId) ? { ...c, clientId: remap.get(c.clientId), updatedAt: Date.now() } : c)),
     excluidos,
   };
 }
@@ -259,8 +276,12 @@ function mergeRemoteIntoStore(
   const clientesMesclados = mesclarLista(s.clients, remote.clients, excluidos);
   const postsMesclados = mesclarLista(s.posts, remote.posts, excluidos);
   const videosMesclados = mesclarLista(s.videos, remote.videos, excluidos);
+  const transactionsMescladas = mesclarLista(s.transactions, remote.transactions, excluidos);
+  const chargesMescladas = mesclarLista(s.charges, remote.charges, excluidos);
+  const libraryMesclada = mesclarLista(s.library, remote.library, excluidos);
+  const campaignsMescladas = mesclarLista(s.campaigns, remote.campaigns, excluidos);
 
-  const dedup = deduplicarClientesPorNome(clientesMesclados, postsMesclados, videosMesclados);
+  const dedup = deduplicarClientesPorNome(clientesMesclados, postsMesclados, videosMesclados, transactionsMescladas, chargesMescladas, campaignsMescladas);
   const tombstonesFinais = new Map([...tombstonesTodos, ...dedup.excluidos].map((t) => [`${t.tipo}:${t.id}`, t]));
 
   const checklistExtrasMerged: Record<string, ChecklistItem[]> = { ...remote.checklistExtras, ...s.checklistExtras };
@@ -275,6 +296,10 @@ function mergeRemoteIntoStore(
     clients: dedup.clients,
     posts: dedup.posts,
     videos: dedup.videos,
+    transactions: dedup.transactions,
+    charges: dedup.charges,
+    library: libraryMesclada,
+    campaigns: dedup.campaigns,
     checklistExtras: checklistExtrasMerged,
     tombstones: [...tombstonesFinais.values()].slice(0, 500),
   }));
@@ -297,7 +322,7 @@ export const useData = create<DataState>()(
        * Conector faria o registro "ressuscitar" quando outro dispositivo
        * ainda tem ele localmente e manda de volta.
        */
-      function marcarExcluido(tipo: 'post' | 'video' | 'cliente', id: string) {
+      function marcarExcluido(tipo: TipoRegistro, id: string) {
         set((s) => ({
           tombstones: [{ tipo, id, quando: Date.now() }, ...s.tombstones].slice(0, 500),
         }));
@@ -510,14 +535,16 @@ export const useData = create<DataState>()(
       // ---------- Financeiro ----------
       addTx: (t) =>
         set((s) => ({
-          transactions: [{ ...t, id: uid('tx'), createdAt: Date.now() }, ...s.transactions],
+          transactions: [{ ...t, id: uid('tx'), createdAt: Date.now(), updatedAt: Date.now() }, ...s.transactions],
         })),
       updateTx: (id, patch) =>
         set((s) => ({
-          transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+          transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t)),
         })),
-      removeTx: (id) =>
-        set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) })),
+      removeTx: (id) => {
+        marcarExcluido('transacao', id);
+        set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }));
+      },
 
       // ---------- Posts ----------
       addPost: (p) => {
@@ -627,11 +654,13 @@ export const useData = create<DataState>()(
 
       // ---------- Biblioteca ----------
       addLibraryItem: (i) =>
-        set((s) => ({ library: [{ ...i, id: uid('lib'), createdAt: Date.now() }, ...s.library] })),
+        set((s) => ({ library: [{ ...i, id: uid('lib'), createdAt: Date.now(), updatedAt: Date.now() }, ...s.library] })),
       updateLibraryItem: (id, patch) =>
-        set((s) => ({ library: s.library.map((l) => (l.id === id ? { ...l, ...patch } : l)) })),
-      removeLibraryItem: (id) =>
-        set((s) => ({ library: s.library.filter((l) => l.id !== id) })),
+        set((s) => ({ library: s.library.map((l) => (l.id === id ? { ...l, ...patch, updatedAt: Date.now() } : l)) })),
+      removeLibraryItem: (id) => {
+        marcarExcluido('biblioteca', id);
+        set((s) => ({ library: s.library.filter((l) => l.id !== id) }));
+      },
 
       // ---------- Automações ----------
       addEvent: (e) =>
@@ -648,28 +677,34 @@ export const useData = create<DataState>()(
               ...c,
               id: uid('camp'),
               createdAt: Date.now(),
+              updatedAt: Date.now(),
               metrics: c.metrics ?? { spend: 0, impressions: 0, reach: 0, clicks: 0, results: 0 },
             },
             ...s.campaigns,
           ],
         })),
       updateCampaign: (id, patch) =>
-        set((s) => ({ campaigns: s.campaigns.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
-      removeCampaign: (id) =>
-        set((s) => ({ campaigns: s.campaigns.filter((c) => c.id !== id) })),
+        set((s) => ({ campaigns: s.campaigns.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c)) })),
+      removeCampaign: (id) => {
+        marcarExcluido('campanha', id);
+        set((s) => ({ campaigns: s.campaigns.filter((c) => c.id !== id) }));
+      },
 
       // ---------- Cobranças ----------
       upsertCharges: (list) =>
         set((s) => ({
           charges: [
             ...s.charges,
-            ...list.filter((n) => !s.charges.some((c) => c.clientId === n.clientId && c.month === n.month)),
+            ...list.filter((n) => !s.charges.some((c) => c.clientId === n.clientId && c.month === n.month))
+              .map((n) => ({ ...n, updatedAt: Date.now() })),
           ],
         })),
       updateCharge: (id, patch) =>
-        set((s) => ({ charges: s.charges.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
-      removeCharge: (id) =>
-        set((s) => ({ charges: s.charges.filter((c) => c.id !== id) })),
+        set((s) => ({ charges: s.charges.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c)) })),
+      removeCharge: (id) => {
+        marcarExcluido('cobranca', id);
+        set((s) => ({ charges: s.charges.filter((c) => c.id !== id) }));
+      },
 
       nextAngle: (clientId, tipo, poolSize) => {
         const atual = get().angleMemory[clientId] ?? { foto: [], video: [] };

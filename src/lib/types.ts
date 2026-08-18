@@ -87,6 +87,8 @@ export interface Charge {
   /** Link da fatura (Pix e boleto) gerado pelo gateway. */
   gatewayUrl?: string;
   createdAt: number;
+  /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
+  updatedAt?: number;
 }
 
 export type Priority = 'baixa' | 'media' | 'alta' | 'urgente';
@@ -157,6 +159,8 @@ export interface Transaction {
   date: string; // ISO date
   status: TxStatus;
   createdAt: number;
+  /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
+  updatedAt?: number;
 }
 
 export type PostPlatform =
@@ -278,6 +282,8 @@ export interface LibraryItem {
    * salvar pra usar depois.
    */
   guardado?: boolean;
+  /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
+  updatedAt?: number;
 }
 
 // -------------------------- Automações --------------------------------
@@ -387,6 +393,8 @@ export interface Campaign {
   /** Marca que o investimento já virou despesa no caixa. */
   postedToFinance?: boolean;
   createdAt: number;
+  /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
+  updatedAt?: number;
 }
 
 export interface WorkspaceData {

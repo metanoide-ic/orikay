@@ -41,7 +41,11 @@ type Decision = PostDecision | CardDecision | PaymentDecision;
 export function connectorPath(url: string, path: string): string {
   try {
     const u = new URL(url.trim());
-    u.pathname = u.pathname.replace(/\/webhook\/?$/, '') + path;
+    // Tira "/webhook" do fim (se veio o endereço usado pro WhatsApp) e
+    // qualquer "/" sobrando, senão endereço raiz ("http://host:porta", sem
+    // caminho) vira "//dados" — o Conector não reconhece a rota, cai na
+    // página de status (HTML) e a sincronização falha em silêncio.
+    u.pathname = u.pathname.replace(/\/webhook\/?$/, '').replace(/\/+$/, '') + path;
     return u.toString();
   } catch {
     return url.trim().replace(/\/+$/, '').replace(/\/webhook$/, '') + path;

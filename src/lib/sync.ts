@@ -18,12 +18,14 @@ export const useSyncStatus = create<SyncStatus>(() => ({
 }));
 
 /**
- * Sincronização entre a equipe via o Conector: manda os clientes,
- * posts, vídeos e checklist de quem está usando agora, mescla com o que
- * já veio de todo mundo (feito no Conector) e traz de volta — é isso que
- * faz um cartão criado ou uma imagem anexada num dispositivo aparecer
- * nos outros. Sem o Conector configurado, a plataforma continua
- * funcionando normalmente, só que só localmente (como sempre foi).
+ * Sincronização entre a equipe via o Conector: manda clientes, posts,
+ * vídeos, financeiro (lançamentos e cobranças), biblioteca, campanhas de
+ * tráfego e checklist de quem está usando agora, mescla com o que já
+ * veio de todo mundo (feito no Conector) e traz de volta — é isso que
+ * faz um cartão criado, uma imagem anexada ou um lançamento financeiro
+ * num dispositivo aparecer nos outros. Sem o Conector configurado, a
+ * plataforma continua funcionando normalmente, só que só localmente
+ * (como sempre foi).
  */
 async function sincronizarAgora(): Promise<boolean> {
   const { connectorUrl } = useSettings.getState();
@@ -34,6 +36,10 @@ async function sincronizarAgora(): Promise<boolean> {
     clients: s.clients,
     posts: s.posts,
     videos: s.videos,
+    transactions: s.transactions,
+    charges: s.charges,
+    library: s.library,
+    campaigns: s.campaigns,
     checklistExtras: s.checklistExtras,
     tombstones: s.tombstones,
   };
