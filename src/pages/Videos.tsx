@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -7,7 +8,10 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, CheckSquare, MessageSquare, Link2, Clapperboard, Trash2, X, FolderOpen, Copy, ArrowRightCircle, GripVertical, ImageIcon } from 'lucide-react';
+import {
+  Plus, CheckSquare, MessageSquare, Link2, Clapperboard, Trash2, X, FolderOpen, Copy, ArrowRightCircle,
+  GripVertical, ImageIcon, ImageUp, CalendarClock, Archive, ArchiveRestore,
+} from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Field, Input, Modal, Select } from '@/components/ui';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
@@ -21,12 +25,51 @@ import type { VideoProject, VideoStage } from '@/lib/types';
 import { VideoModal } from '@/components/VideoModal';
 
 export default function Videos() {
-  const { videos, clients, addVideo, moveVideo, removeVideo } = useData();
+  const { videos: allVideos, clients, addVideo, moveVideo, removeVideo, updateVideo } = useData();
+  const videos = useMemo(() => allVideos.filter((v) => !v.archived), [allVideos]);
+  const arquivados = useMemo(() => allVideos.filter((v) => v.archived), [allVideos]);
   const clientMap = useClientMap();
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: '', clientId: '', editor: '', dueDate: '' });
+  const [showArchived, setShowArchived] = useState(false);
+  const [toast, setToast] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const id = searchParams.get('open');
+    if (id) {
+      setOpenId(id);
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function avisar(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2000);
+  }
+
+  const capaFileRef = useRef<HTMLInputElement>(null);
+  const [capaTargetId, setCapaTargetId] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const [dateTargetId, setDateTargetId] = useState<string | null>(null);
+
+  function onCapaFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f || !capaTargetId) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const v = videos.find((x) => x.id === capaTargetId);
+      const resto = (v?.mediaUrls ?? (v?.mediaUrl ? [v.mediaUrl] : [])).filter((u) => u !== undefined);
+      updateVideo(capaTargetId, { mediaUrls: [String(reader.result), ...resto], mediaUrl: undefined });
+    };
+    reader.readAsDataURL(f);
+  }
 
   // Seleção múltipla ao estilo Windows: Ctrl/Cmd+clique soma, Shift+clique
   // seleciona o intervalo dentro da mesma etapa. Clique simples limpa e abre.
@@ -146,17 +189,50 @@ export default function Videos() {
   function contextItemsFor(video: VideoProject): ContextMenuItem[] {
     const outrasEtapas = stageOrder.filter((s) => s !== video.stage);
     return [
-      { label: 'Abrir', icon: <FolderOpen size={15} />, onSelect: () => setOpenId(video.id) },
+      { label: 'Abrir cartão', icon: <FolderOpen size={15} />, onSelect: () => setOpenId(video.id) },
       {
-        label: 'Duplicar',
+        label: 'Alterar capa',
+        icon: <ImageUp size={15} />,
+        onSelect: () => { setCapaTargetId(video.id); setTimeout(() => capaFileRef.current?.click(), 0); },
+      },
+      {
+        label: 'Editar prazo',
+        icon: <CalendarClock size={15} />,
+        onSelect: () => {
+          setDateTargetId(video.id);
+          setTimeout(() => {
+            const el = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+            if (!el) return;
+            el.value = video.dueDate ?? '';
+            if (typeof el.showPicker === 'function') el.showPicker();
+            else el.click();
+          }, 0);
+        },
+      },
+      {
+        label: 'Copiar link',
+        icon: <Link2 size={15} />,
+        onSelect: () => {
+          const url = `${location.origin}${location.pathname}#/app/videos?open=${video.id}`;
+          navigator.clipboard?.writeText(url);
+          avisar('Link copiado — quem abrir vai direto nesse cartão.');
+        },
+      },
+      {
+        label: 'Duplicar cartão',
         icon: <Copy size={15} />,
-        onSelect: () => addVideo({ title: video.title + ' (cópia)', clientId: video.clientId, editor: video.editor, dueDate: video.dueDate, notes: video.notes }),
+        onSelect: () => addVideo({ title: video.title + ' (cópia)', clientId: video.clientId, editor: video.editor, dueDate: video.dueDate, notes: video.notes, mediaUrls: video.mediaUrls }),
       },
       ...outrasEtapas.map((s) => ({
         label: `Mover para ${VIDEO_STAGE_META[s].label}`,
         icon: <ArrowRightCircle size={15} />,
         onSelect: () => moveVideo(video.id, s),
       })),
+      {
+        label: 'Arquivar',
+        icon: <Archive size={15} />,
+        onSelect: () => { updateVideo(video.id, { archived: true }); avisar('Cartão arquivado.'); },
+      },
       { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => removeVideo(video.id) },
     ];
   }
@@ -218,23 +294,45 @@ export default function Videos() {
         action={<Button onClick={() => setCreating(true)}><Plus size={18} /> Novo vídeo</Button>}
       />
 
-      <DndContext sensors={sensors} collisionDetection={pointerWithin}
-        onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
-        <SortableContext items={stageOrder.map((s) => `col-${s}`)} strategy={horizontalListSortingStrategy}>
-          <div className="board-row flex gap-4 overflow-x-auto pb-4">
-            {stageOrder.map((stage) => (
-              <VideoColumn key={stage} stage={stage} videos={byStage[stage] || []} clientMap={clientMap}
-                selected={selected} onCardClick={handleCardClick}
-                onCardContextMenu={(video, e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, video }); }} />
-            ))}
-          </div>
-        </SortableContext>
-        <DragOverlay>
-          {activeVideo ? <VideoCard video={activeVideo} clientMap={clientMap} dragging />
-            : activeStage ? <div className="flex w-72 shrink-0 items-center gap-2 rounded-xl border border-brand-400/60 bg-ink-850 px-3 py-2.5 shadow-2xl"><span className="h-2.5 w-2.5 rounded-full" style={{ background: VIDEO_STAGE_META[activeStage].color }} /><span className="text-sm font-semibold text-white/90">{VIDEO_STAGE_META[activeStage].label}</span></div>
-            : null}
-        </DragOverlay>
-      </DndContext>
+      {arquivados.length > 0 && (
+        <div className="mb-2 flex justify-end">
+          <button onClick={() => setShowArchived((v) => !v)} className="flex items-center gap-1.5 text-xs font-medium text-white/45 hover:text-white">
+            <Archive size={13} /> {showArchived ? 'Voltar ao quadro' : `Ver arquivados (${arquivados.length})`}
+          </button>
+        </div>
+      )}
+
+      {showArchived ? (
+        <div className="space-y-1.5">
+          {arquivados.map((v) => (
+            <div key={v.id} className="flex items-center gap-3 rounded-lg border border-line bg-ink-850 px-3.5 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-sm text-white/75">{v.title}</span>
+              <Button size="sm" variant="outline" onClick={() => updateVideo(v.id, { archived: false })}>
+                <ArchiveRestore size={14} /> Desarquivar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setOpenId(v.id)}>Abrir</Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={pointerWithin}
+          onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={onDragEnd}>
+          <SortableContext items={stageOrder.map((s) => `col-${s}`)} strategy={horizontalListSortingStrategy}>
+            <div className="board-row flex gap-4 overflow-x-auto pb-4">
+              {stageOrder.map((stage) => (
+                <VideoColumn key={stage} stage={stage} videos={byStage[stage] || []} clientMap={clientMap}
+                  selected={selected} onCardClick={handleCardClick}
+                  onCardContextMenu={(video, e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, video }); }} />
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {activeVideo ? <VideoCard video={activeVideo} clientMap={clientMap} dragging />
+              : activeStage ? <div className="flex w-72 shrink-0 items-center gap-2 rounded-xl border border-brand-400/60 bg-ink-850 px-3 py-2.5 shadow-2xl"><span className="h-2.5 w-2.5 rounded-full" style={{ background: VIDEO_STAGE_META[activeStage].color }} /><span className="text-sm font-semibold text-white/90">{VIDEO_STAGE_META[activeStage].label}</span></div>
+              : null}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       {marquee && createPortal(
         <div
@@ -252,6 +350,20 @@ export default function Videos() {
       )}
 
       {openId && <VideoModal videoId={openId} onClose={() => setOpenId(null)} />}
+
+      <input ref={capaFileRef} type="file" accept="image/*" hidden onChange={onCapaFile} />
+      <input
+        ref={dateInputRef}
+        type="date"
+        className="sr-only"
+        onChange={(e) => { if (dateTargetId) updateVideo(dateTargetId, { dueDate: e.target.value || undefined }); }}
+      />
+
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-xl border border-line bg-ink-850 px-4 py-2.5 text-sm text-white/85 shadow-2xl">
+          {toast}
+        </div>
+      )}
 
       {selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">

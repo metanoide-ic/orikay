@@ -67,6 +67,17 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
           <Input value={post.title} onChange={(e) => updatePost(postId, { title: e.target.value })} />
         </Field>
 
+        {/* Descrição — o que o designer precisa ler primeiro pra saber o que produzir. */}
+        <div className="rounded-2xl border border-brand-400/25 bg-brand-500/[0.06] p-4">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-brand-300">Descrição — o que produzir</div>
+          <Textarea
+            value={post.notes ?? ''}
+            onChange={(e) => updatePost(postId, { notes: e.target.value })}
+            placeholder="Roteiro, referências, texto da arte, hashtags… o que o designer precisa saber pra produzir."
+            className="min-h-[100px] border-transparent bg-transparent px-0 focus:border-transparent focus:ring-0"
+          />
+        </div>
+
         <label className={cn(
           'flex cursor-pointer items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm transition',
           post.awaitingMaterial ? 'border-amber-400/40 bg-amber-500/10 text-amber-200' : 'border-line bg-white/[0.02] text-white/60',
@@ -236,10 +247,6 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
             className="min-h-[120px]"
           />
         </div>
-
-        <Field label="Observações">
-          <Textarea value={post.notes ?? ''} onChange={(e) => updatePost(postId, { notes: e.target.value })} placeholder="Roteiro, referências, hashtags…" />
-        </Field>
 
         <div className="flex items-center justify-between border-t border-line pt-4">
           <Button variant="danger" onClick={() => { removePost(postId); onClose(); }}>

@@ -15,10 +15,18 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   useEffect(() => {
     const fechar = () => onClose();
     const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('click', fechar);
-    window.addEventListener('contextmenu', fechar);
+    // Registra os listeners só depois que o próprio evento de botão direito
+    // que ABRIU o menu termina de se propagar — senão esse mesmo evento
+    // "contextmenu" ainda em curso chega até a window e fecha o menu no
+    // mesmo instante em que ele nasceu (React confirma o DOM de forma
+    // síncrona ainda durante o bubbling do evento nativo).
+    const id = window.setTimeout(() => {
+      window.addEventListener('click', fechar);
+      window.addEventListener('contextmenu', fechar);
+    }, 0);
     window.addEventListener('keydown', tecla);
     return () => {
+      window.clearTimeout(id);
       window.removeEventListener('click', fechar);
       window.removeEventListener('contextmenu', fechar);
       window.removeEventListener('keydown', tecla);

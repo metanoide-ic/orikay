@@ -41,6 +41,17 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
       <div className="space-y-5">
         <Field label="Título"><Input value={video.title} onChange={(e) => update(videoId, { title: e.target.value })} /></Field>
 
+        {/* Descrição — o que o designer/editor precisa ler primeiro pra saber o que produzir. */}
+        <div className="rounded-2xl border border-brand-400/25 bg-brand-500/[0.06] p-4">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-brand-300">Descrição — o que produzir</div>
+          <Textarea
+            value={video.notes ?? ''}
+            onChange={(e) => update(videoId, { notes: e.target.value })}
+            placeholder="Roteiro, referências, gancho, CTA… o que quem edita precisa saber pra produzir."
+            className="min-h-[100px] border-transparent bg-transparent px-0 focus:border-transparent focus:ring-0"
+          />
+        </div>
+
         <div>
           <div className="mb-2 text-xs font-medium text-white/60">Etapa</div>
           <div className="flex flex-wrap gap-1.5">
@@ -127,8 +138,6 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
         <div className="rounded-2xl border border-line p-4">
           <RevisionList revisions={video.revisions} onAdd={(t) => addRev(videoId, t)} onToggle={(id) => toggleRev(videoId, id)} />
         </div>
-
-        <Field label="Observações"><Textarea value={video.notes ?? ''} onChange={(e) => update(videoId, { notes: e.target.value })} /></Field>
 
         <div className="flex items-center justify-between border-t border-line pt-4">
           <Button variant="danger" onClick={() => { remove(videoId); onClose(); }}><Trash2 size={16} /> Excluir</Button>

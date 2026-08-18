@@ -208,6 +208,8 @@ export interface Post {
   published?: boolean;
   /** true quando falta o cliente mandar foto/vídeo — trava a produção até chegar. */
   awaitingMaterial?: boolean;
+  /** true quando arquivado — sai do quadro sem apagar (alternativa a excluir). */
+  archived?: boolean;
   createdAt: number;
 }
 
@@ -244,6 +246,8 @@ export interface VideoProject {
   mediaUrl?: string;
   /** Galeria de anexos (data URLs) — pode ter várias imagens, a primeira é a capa do cartão. */
   mediaUrls?: string[];
+  /** true quando arquivado — sai do quadro sem apagar (alternativa a excluir). */
+  archived?: boolean;
   createdAt: number;
 }
 

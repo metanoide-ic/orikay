@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
   DndContext,
@@ -15,7 +16,8 @@ import { SortableContext, useSortable, verticalListSortingStrategy, horizontalLi
 import { CSS } from '@dnd-kit/utilities';
 import {
   Plus, CheckSquare, MessageSquare, AlertTriangle, LayoutGrid, CalendarDays, X, VideoOff, Trash2,
-  FolderOpen, Copy, Clapperboard, ArrowRightCircle, GripVertical, ImageIcon,
+  FolderOpen, Copy, Clapperboard, ArrowRightCircle, GripVertical, ImageIcon, ImageUp, Link2,
+  CalendarClock, Archive, ArchiveRestore,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientFilter } from '@/components/ClientFilter';
@@ -41,6 +43,47 @@ export default function Posts() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<'pipeline' | 'calendario'>('pipeline');
   const [clientFilter, setClientFilter] = useState<string>('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [toast, setToast] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Link direto ("Copiar link" do menu) abre o cartão certo assim que a
+  // página carrega, e limpa o parâmetro da URL pra não reabrir de novo.
+  useEffect(() => {
+    const id = searchParams.get('open');
+    if (id) {
+      setOpenId(id);
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function avisar(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2000);
+  }
+
+  // Alterar capa e Editar data direto pelo menu de botão direito, sem abrir
+  // o cartão inteiro — inputs escondidos disparados pelo item do menu.
+  const capaFileRef = useRef<HTMLInputElement>(null);
+  const [capaTargetId, setCapaTargetId] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const [dateTargetId, setDateTargetId] = useState<string | null>(null);
+
+  function onCapaFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f || !capaTargetId) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const p = posts.find((x) => x.id === capaTargetId);
+      const resto = (p?.mediaUrls ?? (p?.mediaUrl ? [p.mediaUrl] : [])).filter((u) => u !== undefined);
+      updatePost(capaTargetId, { mediaUrls: [String(reader.result), ...resto], mediaUrl: undefined });
+    };
+    reader.readAsDataURL(f);
+  }
 
   // As colunas podem ser arrastadas de lugar (o usuário decide a ordem que
   // faz mais sentido pra rotina dele) — fica salvo por navegador.
@@ -59,9 +102,11 @@ export default function Posts() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  const naoArquivados = useMemo(() => posts.filter((p) => !p.archived), [posts]);
+  const arquivados = useMemo(() => posts.filter((p) => p.archived), [posts]);
   const visible = useMemo(
-    () => (clientFilter ? posts.filter((p) => p.clientId === clientFilter) : posts),
-    [posts, clientFilter],
+    () => (clientFilter ? naoArquivados.filter((p) => p.clientId === clientFilter) : naoArquivados),
+    [naoArquivados, clientFilter],
   );
 
   const byStage = useMemo(() => {
@@ -203,19 +248,47 @@ export default function Posts() {
   function contextItemsFor(post: Post): ContextMenuItem[] {
     const outrasEtapas = stageOrder.filter((s) => s !== post.stage);
     return [
-      { label: 'Abrir', icon: <FolderOpen size={15} />, onSelect: () => setOpenId(post.id) },
+      { label: 'Abrir cartão', icon: <FolderOpen size={15} />, onSelect: () => setOpenId(post.id) },
+      {
+        label: 'Alterar capa',
+        icon: <ImageUp size={15} />,
+        onSelect: () => { setCapaTargetId(post.id); setTimeout(() => capaFileRef.current?.click(), 0); },
+      },
+      {
+        label: 'Editar data',
+        icon: <CalendarClock size={15} />,
+        onSelect: () => {
+          setDateTargetId(post.id);
+          setTimeout(() => {
+            const el = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+            if (!el) return;
+            el.value = post.scheduledDate ?? '';
+            if (typeof el.showPicker === 'function') el.showPicker();
+            else el.click();
+          }, 0);
+        },
+      },
+      {
+        label: 'Copiar link',
+        icon: <Link2 size={15} />,
+        onSelect: () => {
+          const url = `${location.origin}${location.pathname}#/app/posts?open=${post.id}`;
+          navigator.clipboard?.writeText(url);
+          avisar('Link copiado — quem abrir vai direto nesse cartão.');
+        },
+      },
       {
         label: post.awaitingMaterial ? 'Desmarcar pendência de gravação' : 'Marcar pendência de gravação',
         icon: <Clapperboard size={15} />,
         onSelect: () => updatePost(post.id, { awaitingMaterial: !post.awaitingMaterial }),
       },
       {
-        label: 'Duplicar',
+        label: 'Duplicar cartão',
         icon: <Copy size={15} />,
         onSelect: () => addPost({
           title: post.title + ' (cópia)', platform: post.platform, clientId: post.clientId,
           stage: post.stage, scheduledDate: post.scheduledDate, caption: post.caption, copy: post.copy,
-          notes: post.notes, awaitingMaterial: post.awaitingMaterial,
+          notes: post.notes, awaitingMaterial: post.awaitingMaterial, mediaUrls: post.mediaUrls,
         }),
       },
       ...outrasEtapas.map((s) => ({
@@ -226,6 +299,11 @@ export default function Posts() {
           onPostStageChange(post.id, post.stage, s);
         },
       })),
+      {
+        label: 'Arquivar',
+        icon: <Archive size={15} />,
+        onSelect: () => { updatePost(post.id, { archived: true }); avisar('Cartão arquivado.'); },
+      },
       { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => removePost(post.id) },
     ];
   }
@@ -284,9 +362,28 @@ export default function Posts() {
         }
       />
 
-      <ClientFilter clients={clients} value={clientFilter} onChange={setClientFilter} />
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <ClientFilter clients={clients} value={clientFilter} onChange={setClientFilter} />
+        {arquivados.length > 0 && (
+          <button onClick={() => setShowArchived((v) => !v)} className="flex items-center gap-1.5 text-xs font-medium text-white/45 hover:text-white">
+            <Archive size={13} /> {showArchived ? 'Voltar ao quadro' : `Ver arquivados (${arquivados.length})`}
+          </button>
+        )}
+      </div>
 
-      {view === 'calendario' ? (
+      {showArchived ? (
+        <div className="space-y-1.5">
+          {arquivados.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 rounded-lg border border-line bg-ink-850 px-3.5 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-sm text-white/75">{p.title}</span>
+              <Button size="sm" variant="outline" onClick={() => updatePost(p.id, { archived: false })}>
+                <ArchiveRestore size={14} /> Desarquivar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setOpenId(p.id)}>Abrir</Button>
+            </div>
+          ))}
+        </div>
+      ) : view === 'calendario' ? (
         <PostsCalendar posts={visible} onOpen={setOpenId} />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners}
@@ -324,6 +421,21 @@ export default function Posts() {
       )}
 
       {openId && <PostModal postId={openId} onClose={() => setOpenId(null)} />}
+
+      {/* Inputs escondidos usados pelo menu de botão direito (alterar capa / editar data). */}
+      <input ref={capaFileRef} type="file" accept="image/*" hidden onChange={onCapaFile} />
+      <input
+        ref={dateInputRef}
+        type="date"
+        className="sr-only"
+        onChange={(e) => { if (dateTargetId) updatePost(dateTargetId, { scheduledDate: e.target.value || undefined }); }}
+      />
+
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-xl border border-line bg-ink-850 px-4 py-2.5 text-sm text-white/85 shadow-2xl">
+          {toast}
+        </div>
+      )}
 
       {selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">
