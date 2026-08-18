@@ -72,3 +72,8 @@ export function pickColor(seed: string): string {
 export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+/** Capa de um post/vídeo: primeiro item da galeria, ou o mediaUrl antigo (compatibilidade). */
+export function coverOf(item: { mediaUrls?: string[]; mediaUrl?: string }): string | undefined {
+  return item.mediaUrls?.[0] ?? item.mediaUrl;
+}

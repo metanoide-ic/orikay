@@ -16,7 +16,7 @@ import { useAuth } from '@/lib/authStore';
 import { useSettings } from '@/lib/settingsStore';
 import { useClientMap } from '@/lib/hooks';
 import { VIDEO_STAGE_META, VIDEO_STAGE_ORDER, resolveOrder } from '@/lib/labels';
-import { cn, todayISO } from '@/lib/utils';
+import { cn, todayISO, coverOf } from '@/lib/utils';
 import type { VideoProject, VideoStage } from '@/lib/types';
 import { VideoModal } from '@/components/VideoModal';
 
@@ -345,20 +345,23 @@ function VideoCard({ video, clientMap, dragging, selected }: {
   const done = video.checklist.filter((c) => c.done).length;
   const pendRev = video.revisions.filter((r) => !r.resolved).length;
   const late = video.dueDate && video.dueDate < todayISO() && video.stage !== 'entregue';
+  const cover = coverOf(video);
+  const numAnexos = video.mediaUrls?.length ?? (video.mediaUrl ? 1 : 0);
   return (
     <div className={cn(
-      'cursor-pointer touch-none select-none rounded-lg border border-line bg-ink-850 p-3 transition hover:border-white/20',
+      'cursor-pointer touch-none select-none overflow-hidden rounded-lg border border-line bg-ink-850 transition hover:border-white/20',
       dragging && 'rotate-2 border-brand-400/60 shadow-2xl',
       selected && 'border-brand-400/70 ring-2 ring-brand-400/50',
     )}>
-      <div className="flex items-start gap-2">
+      {cover && <img src={cover} alt="" className="h-28 w-full object-cover" />}
+      <div className="flex items-start gap-2 p-3">
         <div className="min-w-0 flex-1 text-left">
           <div className="flex items-center gap-1.5 text-brand-300"><Clapperboard size={13} /><span className="text-[11px] text-white/40">{assignee?.name || video.editor || 'sem responsável'}</span></div>
           <p className="mt-1 line-clamp-2 text-sm leading-snug text-white/90">{video.title}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-white/45">
             {client && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full" style={{ background: client.color }} />{client.name}</span>}
             {video.links.length > 0 && <span className="inline-flex items-center gap-1"><Link2 size={11} /> {video.links.length}</span>}
-            {video.mediaUrl && <span className="inline-flex items-center gap-1 text-brand-300" title="Tem imagem anexada"><ImageIcon size={11} /></span>}
+            {numAnexos > 0 && <span className="inline-flex items-center gap-1 text-brand-300" title="Tem imagem anexada"><ImageIcon size={11} /> {numAnexos > 1 && numAnexos}</span>}
             {video.checklist.length > 0 && <span className="inline-flex items-center gap-1"><CheckSquare size={11} /> {done}/{video.checklist.length}</span>}
             {pendRev > 0 && <span className="inline-flex items-center gap-1 text-rose-300"><MessageSquare size={11} /> {pendRev}</span>}
             {video.dueDate && <span className={cn('ml-auto', late && 'text-red-300')}>{new Date(video.dueDate + 'T00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>}

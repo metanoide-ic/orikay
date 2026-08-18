@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
-import { Trash2, Sparkles, Loader2, Send, Check, X, Image as ImageIcon, Copy as CopyIcon, VideoOff } from 'lucide-react';
-import { Modal, Button, Field, Input, Textarea, Select } from './ui';
+import { useState } from 'react';
+import { Trash2, Sparkles, Loader2, Send, Check, X, Copy as CopyIcon, VideoOff } from 'lucide-react';
+import { Modal, Button, Field, Input, Textarea, Select, SearchSelect, AttachmentsGallery } from './ui';
 import { RevisionList } from './RevisionList';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
@@ -26,7 +26,6 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
   const [rejecting, setRejecting] = useState(false);
   const [rejectText, setRejectText] = useState('');
   const [copied, setCopied] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!post) return null;
 
@@ -46,12 +45,16 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
     setGenLoading(false);
   }
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => updatePost(postId, { mediaUrl: String(reader.result) });
-    reader.readAsDataURL(f);
+  const anexos = post.mediaUrls ?? (post.mediaUrl ? [post.mediaUrl] : []);
+  function addAnexos(novos: string[]) {
+    updatePost(postId, { mediaUrls: [...anexos, ...novos], mediaUrl: undefined });
+  }
+  function removeAnexo(i: number) {
+    updatePost(postId, { mediaUrls: anexos.filter((_, idx) => idx !== i), mediaUrl: undefined });
+  }
+  function makeCover(i: number) {
+    const next = [anexos[i], ...anexos.filter((_, idx) => idx !== i)];
+    updatePost(postId, { mediaUrls: next, mediaUrl: undefined });
   }
 
   const inApproval = post.stage === 'aprovacao';
@@ -177,10 +180,12 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
             </Select>
           </Field>
           <Field label="Cliente">
-            <Select value={post.clientId ?? ''} onChange={(e) => updatePost(postId, { clientId: e.target.value || undefined })}>
-              <option value="">—</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
+            <SearchSelect
+              value={post.clientId ?? ''}
+              onChange={(id) => updatePost(postId, { clientId: id || undefined })}
+              options={clients.map((c) => ({ id: c.id, label: c.name, color: c.color }))}
+              placeholder="Buscar cliente…"
+            />
           </Field>
           <Field label="Responsável">
             <Select value={post.assigneeId ?? ''} onChange={(e) => updatePost(postId, { assigneeId: e.target.value || undefined })}>
@@ -194,28 +199,10 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
           <Input type="date" value={post.scheduledDate ?? ''} onChange={(e) => updatePost(postId, { scheduledDate: e.target.value || undefined })} />
         </Field>
 
-        {/* Mídia */}
+        {/* Anexos */}
         <div>
-          <div className="mb-1.5 text-xs font-medium text-white/60">Mídia (imagem)</div>
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
-          {post.mediaUrl ? (
-            <div className="relative w-fit">
-              <img src={post.mediaUrl} alt="" className="max-h-48 rounded-xl border border-line" />
-              <button
-                onClick={() => updatePost(postId, { mediaUrl: undefined })}
-                className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-white/70 ring-1 ring-line hover:text-red-300"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-2 rounded-xl border border-dashed border-line px-4 py-3 text-sm text-white/50 hover:border-brand-400/50 hover:text-white"
-            >
-              <ImageIcon size={16} /> Enviar imagem
-            </button>
-          )}
+          <div className="mb-1.5 text-xs font-medium text-white/60">Anexos (a primeira imagem é a capa do cartão)</div>
+          <AttachmentsGallery items={anexos} onAdd={addAnexos} onRemove={removeAnexo} onMakeCover={makeCover} />
         </div>
 
         {/* Copy com IA */}

@@ -196,8 +196,10 @@ export interface Post {
   /** Responsável (id da conta). */
   assigneeId?: ID;
   notes?: string;
-  /** Imagem/mídia de referência (data URL). */
+  /** Imagem/mídia de referência (data URL) — mantido por compatibilidade; a capa é mediaUrls[0] ?? mediaUrl. */
   mediaUrl?: string;
+  /** Galeria de anexos (data URLs) — pode ter várias imagens, a primeira é a capa do cartão. */
+  mediaUrls?: string[];
   checklist: ChecklistItem[];
   revisions: Revision[];
   /** true quando foi enviado ao grupo para aprovação. */
@@ -238,8 +240,10 @@ export interface VideoProject {
   links: VideoLink[];
   checklist: ChecklistItem[];
   revisions: Revision[];
-  /** Imagem/thumbnail de referência (data URL) — capa, print, frame de exemplo. */
+  /** Imagem/thumbnail de referência (data URL) — capa, print, frame de exemplo. Mantido por compatibilidade; a capa é mediaUrls[0] ?? mediaUrl. */
   mediaUrl?: string;
+  /** Galeria de anexos (data URLs) — pode ter várias imagens, a primeira é a capa do cartão. */
+  mediaUrls?: string[];
   createdAt: number;
 }
 

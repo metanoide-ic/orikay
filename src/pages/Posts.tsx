@@ -28,7 +28,7 @@ import { useSettings } from '@/lib/settingsStore';
 import { useClientMap } from '@/lib/hooks';
 import { STAGE_META, STAGE_ORDER, STAGE_FUNNEL, PLATFORM_COLOR, resolveOrder } from '@/lib/labels';
 import { onPostStageChange } from '@/lib/automations';
-import { cn, todayISO } from '@/lib/utils';
+import { cn, todayISO, coverOf } from '@/lib/utils';
 import type { Post, PostStage } from '@/lib/types';
 import { PostModal } from '@/components/PostModal';
 
@@ -452,13 +452,17 @@ function PostCard({ post, clientMap, dragging, selected }: {
   const today = todayISO();
   const late = post.scheduledDate && post.scheduledDate < today && post.stage !== 'publicado';
   const dueToday = post.scheduledDate === today && post.stage !== 'publicado';
+  const cover = coverOf(post);
+  const numAnexos = post.mediaUrls?.length ?? (post.mediaUrl ? 1 : 0);
 
   return (
     <div className={cn(
-      'cursor-pointer touch-none select-none rounded-lg border border-line bg-ink-850 p-2.5 shadow-sm transition hover:border-white/20',
+      'cursor-pointer touch-none select-none overflow-hidden rounded-lg border border-line bg-ink-850 shadow-sm transition hover:border-white/20',
       dragging && 'rotate-2 border-brand-400/60 shadow-xl',
       selected && 'border-brand-400/70 ring-2 ring-brand-400/50',
     )}>
+      {cover && <img src={cover} alt="" className="h-28 w-full object-cover" />}
+      <div className="p-2.5">
       {/* barra de etiqueta estilo Trello */}
       <div className="mb-2 flex items-center gap-1.5">
         <span className="h-1.5 w-9 rounded-full" style={{ background: PLATFORM_COLOR[post.platform] }} title={post.platform} />
@@ -479,7 +483,7 @@ function PostCard({ post, clientMap, dragging, selected }: {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-white/45">
         <span className="text-white/40">{post.platform}</span>
-        {post.mediaUrl && <span className="inline-flex items-center gap-1 text-brand-300" title="Tem imagem anexada"><ImageIcon size={11} /></span>}
+        {numAnexos > 0 && <span className="inline-flex items-center gap-1 text-brand-300" title="Tem imagem anexada"><ImageIcon size={11} /> {numAnexos > 1 && numAnexos}</span>}
         {post.checklist.length > 0 && <span className="inline-flex items-center gap-1"><CheckSquare size={11} /> {done}/{post.checklist.length}</span>}
         {pendRev > 0 && <span className="inline-flex items-center gap-1 text-rose-300"><MessageSquare size={11} /> {pendRev}</span>}
         {post.sentForApproval && post.stage === 'aprovacao' && <Badge color="#ec4899">no grupo</Badge>}
@@ -488,6 +492,7 @@ function PostCard({ post, clientMap, dragging, selected }: {
           {post.scheduledDate && <span>{new Date(post.scheduledDate + 'T00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>}
           {assignee && <Avatar name={assignee.name} color={assignee.color} size={18} />}
         </span>
+      </div>
       </div>
     </div>
   );

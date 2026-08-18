@@ -5,10 +5,13 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
   useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { cn, initials } from '@/lib/utils';
 
 /* ---------------------------- Button ---------------------------- */
@@ -55,11 +58,15 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="block space-y-1.5">
+    // Div, não <label>: um <label> reencaminha um clique extra pro primeiro
+    // controle "labelable" de dentro (input/button/select), o que quebrava
+    // combobox custom com vários botões (ex.: SearchSelect reabria sozinho
+    // depois de escolher uma opção).
+    <div className="block space-y-1.5">
       {label && <span className="text-xs font-medium text-white/60">{label}</span>}
       {children}
       {hint && <span className="block text-xs text-white/40">{hint}</span>}
-    </label>
+    </div>
   );
 }
 
@@ -91,6 +98,113 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
         backgroundPosition: 'right 0.75rem center',
       }}
     />
+  );
+}
+
+/* -------------------------- SearchSelect -------------------------- */
+/**
+ * Combobox pesquisável: mostra o valor escolhido, e ao clicar abre uma
+ * lista filtrável por texto — pra escolher rápido entre muitas opções
+ * (ex.: cliente) sem rolar um <select> gigante.
+ */
+export function SearchSelect({
+  value,
+  onChange,
+  options,
+  placeholder = 'Buscar…',
+  emptyLabel = '—',
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  options: Array<{ id: string; label: string; color?: string }>;
+  placeholder?: string;
+  emptyLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = options.find((o) => o.id === value);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuery('');
+    setTimeout(() => inputRef.current?.focus(), 0);
+    function onDocClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(fieldCls, 'flex w-full items-center justify-between gap-2 text-left cursor-pointer')}
+      >
+        <span className={cn('flex min-w-0 items-center gap-2 truncate', !selected && 'text-white/40')}>
+          {selected?.color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: selected.color }} />}
+          <span className="truncate">{selected ? selected.label : emptyLabel}</span>
+        </span>
+        <ChevronDown size={15} className="shrink-0 text-white/40" />
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1.5 w-full overflow-hidden rounded-xl border border-line bg-ink-800 shadow-2xl">
+          <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+            <Search size={14} className="shrink-0 text-white/35" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholder}
+              className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false); }}
+              className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/60 hover:bg-white/[0.06]', !value && 'text-brand-300')}
+            >
+              {emptyLabel}
+              {!value && <Check size={13} className="ml-auto shrink-0" />}
+            </button>
+            {filtered.length === 0 && (
+              <div className="px-3 py-3 text-center text-xs text-white/35">Nada encontrado.</div>
+            )}
+            {filtered.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => { onChange(o.id); setOpen(false); }}
+                className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/85 hover:bg-white/[0.06]', o.id === value && 'text-brand-300')}
+              >
+                {o.color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: o.color }} />}
+                <span className="truncate">{o.label}</span>
+                {o.id === value && <Check size={13} className="ml-auto shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -150,6 +264,100 @@ export function Switch({
         )}
       />
     </button>
+  );
+}
+
+/* ------------------------- AttachmentsGallery ------------------------- */
+/**
+ * Galeria de anexos (imagens) de um post/vídeo: grade de miniaturas, a
+ * primeira é a capa que aparece no cartão do quadro. Clica numa miniatura
+ * pra ver grande, "Definir como capa" reordena, X remove. Aceita mandar
+ * várias imagens de uma vez.
+ */
+export function AttachmentsGallery({
+  items,
+  onAdd,
+  onRemove,
+  onMakeCover,
+}: {
+  items: string[];
+  onAdd: (dataUrls: string[]) => void;
+  onRemove: (index: number) => void;
+  onMakeCover: (index: number) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<number | null>(null);
+
+  function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const readers = Array.from(files).map(
+      (f) =>
+        new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.readAsDataURL(f);
+        }),
+    );
+    Promise.all(readers).then(onAdd);
+    e.target.value = '';
+  }
+
+  return (
+    <div>
+      <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onFiles} />
+      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
+        {items.map((url, i) => (
+          <div key={i} className="group relative aspect-square overflow-hidden rounded-xl border border-line bg-white/[0.02]">
+            <img src={url} alt="" className="h-full w-full cursor-pointer object-cover" onClick={() => setPreview(i)} />
+            {i === 0 && (
+              <span className="absolute left-1.5 top-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white/85">Capa</span>
+            )}
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/70 to-transparent p-1.5 opacity-0 transition group-hover:opacity-100">
+              {i !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => onMakeCover(i)}
+                  className="rounded-md bg-black/60 px-1.5 py-1 text-[10px] font-medium text-white/85 hover:text-brand-300"
+                  title="Definir como capa"
+                >
+                  Definir capa
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onRemove(i)}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-black/60 text-white/70 hover:text-red-300"
+                title="Remover"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line text-white/40 hover:border-brand-400/50 hover:text-white"
+        >
+          <span className="text-xl leading-none">+</span>
+          <span className="text-[10px]">Anexar</span>
+        </button>
+      </div>
+
+      {preview !== null && items[preview] && createPortal(
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85 p-6" onClick={() => setPreview(null)}>
+          <img src={items[preview]} alt="" className="max-h-[85vh] max-w-full rounded-xl object-contain" />
+          <button
+            onClick={() => setPreview(null)}
+            className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          >
+            <X size={18} />
+          </button>
+        </div>,
+        document.body,
+      )}
+    </div>
   );
 }
 
