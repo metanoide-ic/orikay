@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path';
 const PORT = Number(process.env.PORT || 8787);
 const DIR = dirname(fileURLToPath(import.meta.url));
 const CONFIG_FILE = join(DIR, 'conector.config.json');
+const DADOS_FILE = join(DIR, 'dados-compartilhados.json');
 
 // No computador de casa, ninguém mais alcança "localhost" — sem exigência
 // nenhuma, como sempre foi. Hospedado num servidor com endereço público,
@@ -97,6 +98,73 @@ function guardarMensagem(grupo, texto) {
   if (!texto) return;
   mensagensRecebidas.unshift({ grupo, texto: String(texto).slice(0, 2000), quando: Date.now() });
   mensagensRecebidas.length = Math.min(mensagensRecebidas.length, 300);
+}
+
+/**
+ * Estado compartilhado da equipe (clientes, posts, vídeos, checklist) — o
+ * que faz "quando um sobe uma imagem, aparece pra todo mundo" funcionar.
+ * Cada dispositivo manda o que tem de mais novo pra cá em POST /dados, o
+ * Conector mescla (ganha quem tem updatedAt mais recente, por registro) e
+ * devolve o resultado — que já é a verdade combinada de todo mundo até
+ * agora. Fica salvo em arquivo, sobrevive a reiniciar o Conector.
+ */
+const DADOS_VAZIOS = { clients: [], posts: [], videos: [], checklistExtras: {}, tombstones: [] };
+function lerDadosCompartilhados() {
+  if (!existsSync(DADOS_FILE)) return { ...DADOS_VAZIOS };
+  try {
+    return { ...DADOS_VAZIOS, ...JSON.parse(readFileSync(DADOS_FILE, 'utf8')) };
+  } catch {
+    return { ...DADOS_VAZIOS };
+  }
+}
+let dadosCompartilhados = lerDadosCompartilhados();
+let gravarDadosPendente = null;
+function gravarDadosCompartilhados() {
+  // Debounce simples: várias sincronizações em sequência não batem disco toda hora.
+  if (gravarDadosPendente) clearTimeout(gravarDadosPendente);
+  gravarDadosPendente = setTimeout(() => {
+    try { writeFileSync(DADOS_FILE, JSON.stringify(dadosCompartilhados)); } catch (e) { registrar('sync', `falha ao gravar dados: ${e.message}`, false); }
+  }, 500);
+}
+
+/** Mescla uma lista por id: ganha quem tem `updatedAt` mais recente. Sem updatedAt nos dois, o que já estava aqui prevalece. */
+function mesclarLista(atuais, recebidos, excluidos) {
+  const porId = new Map(atuais.map((x) => [x.id, x]));
+  for (const r of recebidos) {
+    const existente = porId.get(r.id);
+    if (!existente || (r.updatedAt ?? 0) > (existente.updatedAt ?? 0)) porId.set(r.id, r);
+  }
+  return [...porId.values()].filter((x) => !excluidos.has(x.id));
+}
+
+function mesclarDados(recebido) {
+  const tombstonesTodos = [...dadosCompartilhados.tombstones, ...(recebido.tombstones || [])];
+  const vistos = new Set();
+  const tombstonesUnicos = tombstonesTodos.filter((t) => {
+    const chave = `${t.tipo}:${t.id}`;
+    if (vistos.has(chave)) return false;
+    vistos.add(chave);
+    return true;
+  }).slice(0, 500);
+  const excluidos = new Set(tombstonesUnicos.map((t) => t.id));
+
+  const checklistExtras = { ...dadosCompartilhados.checklistExtras };
+  for (const data of Object.keys(recebido.checklistExtras || {})) {
+    const atuais = checklistExtras[data] ?? [];
+    const recebidos = recebido.checklistExtras[data] ?? [];
+    const idsAtuais = new Set(atuais.map((i) => i.id));
+    checklistExtras[data] = [...atuais, ...recebidos.filter((i) => !idsAtuais.has(i.id))];
+  }
+
+  dadosCompartilhados = {
+    clients: mesclarLista(dadosCompartilhados.clients, recebido.clients || [], excluidos),
+    posts: mesclarLista(dadosCompartilhados.posts, recebido.posts || [], excluidos),
+    videos: mesclarLista(dadosCompartilhados.videos, recebido.videos || [], excluidos),
+    checklistExtras,
+    tombstones: tombstonesUnicos,
+  };
+  gravarDadosCompartilhados();
+  return dadosCompartilhados;
 }
 
 /* ------------------------------ WhatsApp ------------------------------ */
@@ -1037,6 +1105,27 @@ const servidor = createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, resultado }));
+  }
+
+  // Sincronização de clientes/posts/vídeos/checklist entre a equipe. GET só
+  // lê o que já está aqui (primeira carga); POST manda o que o dispositivo
+  // tem, o Conector mescla com o que já tinha de todo mundo e devolve a
+  // verdade combinada — é isso que faz um cartão criado ou uma imagem
+  // anexada em um dispositivo aparecer nos outros.
+  if (url.pathname === '/dados' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, dados: dadosCompartilhados }));
+  }
+  if (url.pathname === '/dados' && req.method === 'POST') {
+    try {
+      const recebido = await corpo(req);
+      const mesclado = mesclarDados(recebido);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true, dados: mesclado }));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, erro: e.message }));
+    }
   }
 
   // A IA Helper (só admin) lê aqui as mensagens cruas recebidas no WhatsApp

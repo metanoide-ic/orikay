@@ -63,6 +63,8 @@ export interface Client {
   /** Raio de atendimento em km, quando a área é por raio. */
   serviceRadiusKm?: number;
   createdAt: number;
+  /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
+  updatedAt?: number;
 }
 
 // -------------------------- Cobrança ----------------------------------
@@ -211,6 +213,8 @@ export interface Post {
   /** true quando arquivado — sai do quadro sem apagar (alternativa a excluir). */
   archived?: boolean;
   createdAt: number;
+  /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
+  updatedAt?: number;
 }
 
 // -------------------------- Edição de vídeo ---------------------------
@@ -249,6 +253,8 @@ export interface VideoProject {
   /** true quando arquivado — sai do quadro sem apagar (alternativa a excluir). */
   archived?: boolean;
   createdAt: number;
+  /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
+  updatedAt?: number;
 }
 
 // -------------------------- Biblioteca --------------------------------

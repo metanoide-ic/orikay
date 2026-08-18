@@ -19,7 +19,7 @@ import type {
   VideoProject,
   VideoStage,
 } from './types';
-import { uid, acharPorNome } from './utils';
+import { uid, acharPorNome, normalizarNome } from './utils';
 import { seedData, OLD_BRIEFINGS } from './seed';
 
 interface DataState {
@@ -143,6 +143,21 @@ interface DataState {
    * antiga é descartada e recomeça do zero automaticamente).
    */
   nextAngle: (clientId: string, tipo: 'foto' | 'video', poolSize: number) => number;
+
+  /**
+   * Registros excluídos recentemente (post/vídeo/cliente) — sem isso, a
+   * sincronização com o Conector faria um registro apagado aqui
+   * "ressuscitar" quando outro dispositivo, que ainda tem ele localmente,
+   * manda de volta na próxima sincronização.
+   */
+  tombstones: Array<{ tipo: 'post' | 'video' | 'cliente'; id: string; quando: number }>;
+  /**
+   * Aplica o estado que veio do Conector (já mesclado lá com o de todo
+   * mundo): registro por registro, ganha quem tiver o `updatedAt` mais
+   * recente; ids marcados como excluídos (tombstones, de qualquer lado)
+   * somem daqui. Usada só pelo módulo de sincronização (`lib/sync.ts`).
+   */
+  applyRemoteState: (remote: RemoteSyncData) => void;
 }
 
 const empty = {
@@ -150,7 +165,120 @@ const empty = {
   videos: [], library: [], events: [], charges: [], campaigns: [],
   angleMemory: {} as Record<string, { foto: number[]; video: number[] }>,
   checklistExtras: {} as Record<string, ChecklistItem[]>,
+  tombstones: [] as Array<{ tipo: 'post' | 'video' | 'cliente'; id: string; quando: number }>,
 };
+
+/** Formato trocado com o Conector pra sincronizar clientes/posts/vídeos entre a equipe. */
+export interface RemoteSyncData {
+  clients: Client[];
+  posts: Post[];
+  videos: VideoProject[];
+  checklistExtras: Record<string, ChecklistItem[]>;
+  tombstones: Array<{ tipo: 'post' | 'video' | 'cliente'; id: string; quando: number }>;
+}
+
+/** Mescla um registro só (por id) com o remoto: fica quem tem updatedAt mais novo. Sem updatedAt em nenhum dos dois, o local prevalece (evita sumir dado antigo). */
+function mesclarLista<T extends { id: string; updatedAt?: number }>(locais: T[], remotos: T[], excluidos: Set<string>): T[] {
+  const porId = new Map<string, T>();
+  for (const l of locais) porId.set(l.id, l);
+  for (const r of remotos) {
+    const atual = porId.get(r.id);
+    if (!atual || (r.updatedAt ?? 0) > (atual.updatedAt ?? 0)) porId.set(r.id, r);
+  }
+  return [...porId.values()].filter((x) => !excluidos.has(x.id));
+}
+
+/**
+ * Antes da sincronização existir, cada dispositivo semeava a própria
+ * carteira de clientes sozinho — o mesmo "Vidroscar" nasceu com um id
+ * diferente em cada tela. Sem tratar isso, a primeira sincronização
+ * duplicaria a carteira inteira. Agrupa por nome normalizado; o mais
+ * antigo (createdAt menor) vira o canônico, os outros viram tombstone e
+ * têm o clientId de post/vídeo remapeado pro canônico.
+ */
+function deduplicarClientesPorNome(
+  clients: Client[],
+  posts: Post[],
+  videos: VideoProject[],
+): { clients: Client[]; posts: Post[]; videos: VideoProject[]; excluidos: Array<{ tipo: 'cliente'; id: string; quando: number }> } {
+  const grupos = new Map<string, Client[]>();
+  for (const c of clients) {
+    const chave = normalizarNome(c.name);
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave)!.push(c);
+  }
+
+  const remap = new Map<string, string>(); // id perdedor -> id canônico
+  const canonicos: Client[] = [];
+  const excluidos: Array<{ tipo: 'cliente'; id: string; quando: number }> = [];
+
+  for (const grupo of grupos.values()) {
+    if (grupo.length === 1) { canonicos.push(grupo[0]); continue; }
+    const ordenado = [...grupo].sort((a, b) => a.createdAt - b.createdAt);
+    const [vencedor, ...perdedores] = ordenado;
+    // O vencedor fica com o melhor de cada campo preenchido entre os duplicados,
+    // pra não perder briefing/grupo de WhatsApp que só um dos dois tinha.
+    let mesclado = vencedor;
+    for (const p of perdedores) {
+      mesclado = {
+        ...p, ...mesclado,
+        briefing: mesclado.briefing || p.briefing,
+        whatsappGroup: mesclado.whatsappGroup || p.whatsappGroup,
+        cities: mesclado.cities?.length ? mesclado.cities : p.cities,
+        weeklyPlan: Object.keys(mesclado.weeklyPlan ?? {}).length ? mesclado.weeklyPlan : p.weeklyPlan,
+        updatedAt: Date.now(),
+      };
+      remap.set(p.id, vencedor.id);
+      excluidos.push({ tipo: 'cliente', id: p.id, quando: Date.now() });
+    }
+    canonicos.push(mesclado);
+  }
+
+  if (remap.size === 0) return { clients, posts, videos, excluidos: [] };
+  return {
+    clients: canonicos,
+    // Bumpa updatedAt junto: sem isso, o remapeamento só convence os outros
+    // dispositivos na próxima vez que alguém mexer de verdade nesse post/
+    // vídeo — com timestamp igual ao que o servidor já tem, a mesclagem por
+    // "quem é mais novo" não teria motivo pra propagar a correção.
+    posts: posts.map((p) => (p.clientId && remap.has(p.clientId) ? { ...p, clientId: remap.get(p.clientId), updatedAt: Date.now() } : p)),
+    videos: videos.map((v) => (v.clientId && remap.has(v.clientId) ? { ...v, clientId: remap.get(v.clientId), updatedAt: Date.now() } : v)),
+    excluidos,
+  };
+}
+
+function mergeRemoteIntoStore(
+  set: (fn: (s: DataState) => Partial<DataState>) => void,
+  get: () => DataState,
+  remote: RemoteSyncData,
+): void {
+  const s = get();
+  const tombstonesTodos = [...s.tombstones, ...remote.tombstones];
+  const excluidos = new Set(tombstonesTodos.map((t) => t.id));
+
+  const clientesMesclados = mesclarLista(s.clients, remote.clients, excluidos);
+  const postsMesclados = mesclarLista(s.posts, remote.posts, excluidos);
+  const videosMesclados = mesclarLista(s.videos, remote.videos, excluidos);
+
+  const dedup = deduplicarClientesPorNome(clientesMesclados, postsMesclados, videosMesclados);
+  const tombstonesFinais = new Map([...tombstonesTodos, ...dedup.excluidos].map((t) => [`${t.tipo}:${t.id}`, t]));
+
+  const checklistExtrasMerged: Record<string, ChecklistItem[]> = { ...remote.checklistExtras, ...s.checklistExtras };
+  for (const data of Object.keys(remote.checklistExtras)) {
+    const locais = s.checklistExtras[data] ?? [];
+    const remotos = remote.checklistExtras[data] ?? [];
+    const idsLocais = new Set(locais.map((i) => i.id));
+    checklistExtrasMerged[data] = [...locais, ...remotos.filter((i) => !idsLocais.has(i.id))];
+  }
+
+  set(() => ({
+    clients: dedup.clients,
+    posts: dedup.posts,
+    videos: dedup.videos,
+    checklistExtras: checklistExtrasMerged,
+    tombstones: [...tombstonesFinais.values()].slice(0, 500),
+  }));
+}
 
 function embaralhar<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -163,7 +291,19 @@ function embaralhar<T>(arr: T[]): T[] {
 
 export const useData = create<DataState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      /**
+       * Marca um registro como excluído — sem isso, sincronizar com o
+       * Conector faria o registro "ressuscitar" quando outro dispositivo
+       * ainda tem ele localmente e manda de volta.
+       */
+      function marcarExcluido(tipo: 'post' | 'video' | 'cliente', id: string) {
+        set((s) => ({
+          tombstones: [{ tipo, id, quando: Date.now() }, ...s.tombstones].slice(0, 500),
+        }));
+      }
+
+      return {
       ...empty,
       seeded: false,
 
@@ -220,16 +360,18 @@ export const useData = create<DataState>()(
 
       // ---------- Clientes ----------
       addClient: (c) => {
-        const client: Client = { ...c, id: uid('cli'), createdAt: Date.now() };
+        const client: Client = { ...c, id: uid('cli'), createdAt: Date.now(), updatedAt: Date.now() };
         set((s) => ({ clients: [...s.clients, client] }));
         return client;
       },
       updateClient: (id, patch) =>
         set((s) => ({
-          clients: s.clients.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          clients: s.clients.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c)),
         })),
-      removeClient: (id) =>
-        set((s) => ({ clients: s.clients.filter((c) => c.id !== id) })),
+      removeClient: (id) => {
+        marcarExcluido('cliente', id);
+        set((s) => ({ clients: s.clients.filter((c) => c.id !== id) }));
+      },
 
       // ---------- Quadros ----------
       addBoard: ({ name, description, clientId, area }) => {
@@ -379,24 +521,24 @@ export const useData = create<DataState>()(
 
       // ---------- Posts ----------
       addPost: (p) => {
-        const post: Post = { ...p, id: uid('post'), createdAt: Date.now(), checklist: p.checklist ?? [], revisions: [] };
+        const post: Post = { ...p, id: uid('post'), createdAt: Date.now(), updatedAt: Date.now(), checklist: p.checklist ?? [], revisions: [] };
         set((s) => ({ posts: [post, ...s.posts] }));
         return post;
       },
       updatePost: (id, patch) =>
         set((s) => ({
-          posts: s.posts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+          posts: s.posts.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: Date.now() } : p)),
         })),
       setPostStage: (id, stage) =>
         set((s) => ({
-          posts: s.posts.map((p) => (p.id === id ? { ...p, stage } : p)),
+          posts: s.posts.map((p) => (p.id === id ? { ...p, stage, updatedAt: Date.now() } : p)),
         })),
       movePost: (postId, toStage, toIndex) =>
         set((s) => {
           const moving = s.posts.find((p) => p.id === postId);
           if (!moving) return {};
           const without = s.posts.filter((p) => p.id !== postId);
-          const updated = { ...moving, stage: toStage };
+          const updated = { ...moving, stage: toStage, updatedAt: Date.now() };
           const targetIds = without.filter((p) => p.stage === toStage).map((p) => p.id);
           const idx = Math.max(0, Math.min(toIndex, targetIds.length));
           let globalIndex: number;
@@ -410,7 +552,10 @@ export const useData = create<DataState>()(
           result.splice(globalIndex, 0, updated);
           return { posts: result };
         }),
-      removePost: (id) => set((s) => ({ posts: s.posts.filter((p) => p.id !== id) })),
+      removePost: (id) => {
+        marcarExcluido('post', id);
+        set((s) => ({ posts: s.posts.filter((p) => p.id !== id) }));
+      },
       addRevision: (postId, text) =>
         set((s) => ({
           posts: s.posts.map((p) =>
@@ -438,16 +583,19 @@ export const useData = create<DataState>()(
       addVideo: ({ title, clientId, editor, dueDate, notes, mediaUrls }) => {
         const video: VideoProject = {
           id: uid('vid'), title, clientId, editor, dueDate, notes, mediaUrls,
-          stage: 'briefing', links: [], checklist: [], revisions: [], createdAt: Date.now(),
+          stage: 'briefing', links: [], checklist: [], revisions: [], createdAt: Date.now(), updatedAt: Date.now(),
         };
         set((s) => ({ videos: [video, ...s.videos] }));
         return video;
       },
       updateVideo: (id, patch) =>
-        set((s) => ({ videos: s.videos.map((v) => (v.id === id ? { ...v, ...patch } : v)) })),
-      removeVideo: (id) => set((s) => ({ videos: s.videos.filter((v) => v.id !== id) })),
+        set((s) => ({ videos: s.videos.map((v) => (v.id === id ? { ...v, ...patch, updatedAt: Date.now() } : v)) })),
+      removeVideo: (id) => {
+        marcarExcluido('video', id);
+        set((s) => ({ videos: s.videos.filter((v) => v.id !== id) }));
+      },
       moveVideo: (id, stage) =>
-        set((s) => ({ videos: s.videos.map((v) => (v.id === id ? { ...v, stage } : v)) })),
+        set((s) => ({ videos: s.videos.map((v) => (v.id === id ? { ...v, stage, updatedAt: Date.now() } : v)) })),
       addVideoLink: (id, link) =>
         set((s) => ({
           videos: s.videos.map((v) =>
@@ -564,7 +712,10 @@ export const useData = create<DataState>()(
             [date]: (s.checklistExtras[date] ?? []).filter((i) => i.id !== id),
           },
         })),
-    }),
+
+      applyRemoteState: (remote) => mergeRemoteIntoStore(set, get, remote),
+      };
+    },
     { name: 'origem.data' },
   ),
 );

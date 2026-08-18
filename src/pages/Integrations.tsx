@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/authStore';
 import { useData } from '@/lib/dataStore';
 import { requestNotifyPermission } from '@/lib/notifications';
 import { buscarGruposDoConector, autoMatchGroups } from '@/lib/groupMatch';
+import { useSyncStatus } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
 function Section({ icon, title, desc, children, tint }: { icon: React.ReactNode; title: string; desc?: string; children: React.ReactNode; tint: string }) {
@@ -29,6 +30,26 @@ function Note({ children }: { children: React.ReactNode }) {
     <div className="flex items-start gap-2 rounded-xl border border-brand-500/25 bg-brand-500/[0.06] px-3.5 py-2.5 text-xs text-white/60">
       <Info size={14} className="mt-0.5 shrink-0 text-brand-300" />
       <div>{children}</div>
+    </div>
+  );
+}
+
+/** Mostra se a sincronização de clientes/posts/vídeos com a equipe está rolando (via o Conector). */
+function SyncStatusIndicator() {
+  const { sincronizando, ultimaVez, ultimoErro } = useSyncStatus();
+  let texto: string;
+  let cor: string;
+  if (sincronizando) { texto = 'Sincronizando com a equipe…'; cor = 'text-brand-300'; }
+  else if (ultimaVez) {
+    const seg = Math.round((Date.now() - ultimaVez) / 1000);
+    texto = `Sincronizado com a equipe há ${seg < 5 ? 'poucos segundos' : `${seg}s`}`;
+    cor = 'text-emerald-300';
+  } else if (ultimoErro) { texto = 'Não consegui falar com o Conector — confira se ele está aberto.'; cor = 'text-red-300'; }
+  else { texto = 'Aguardando primeira sincronização…'; cor = 'text-white/40'; }
+  return (
+    <div className={cn('flex items-center gap-2 text-xs', cor)}>
+      <span className={cn('h-1.5 w-1.5 rounded-full', sincronizando ? 'animate-pulse bg-brand-400' : ultimaVez ? 'bg-emerald-400' : ultimoErro ? 'bg-red-400' : 'bg-white/20')} />
+      {texto}
     </div>
   );
 }
@@ -169,6 +190,7 @@ export default function Integrations() {
             Cole o mesmo endereço nos campos de WhatsApp e de publicação abaixo. Este
             campo é o que permite trazer os números das campanhas de tráfego.
           </Note>
+          {s.connectorUrl && <SyncStatusIndicator />}
         </Section>
 
         {/* Cobrança */}

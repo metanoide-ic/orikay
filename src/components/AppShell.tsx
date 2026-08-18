@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/authStore';
 import { useSettings } from '@/lib/settingsStore';
 import { usePendingPosts, fireDueNotifications } from '@/lib/notifications';
 import { useApprovalInbox } from '@/lib/inbox';
+import { useLiveSync } from '@/lib/sync';
 import { autoSendDueCharges } from '@/lib/billing';
 import { generateMonthlyExpenses } from '@/lib/expenses';
 import { cn } from '@/lib/utils';
@@ -138,6 +139,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const canFinance = useAuth((s) => s.current()?.canFinance);
   useApprovalInbox();
+  useLiveSync();
 
   // Cobrança do dia: roda sozinha ao abrir a plataforma, em qualquer tela,
   // não só quando alguém entra no Financeiro. Só quem tem permissão de
