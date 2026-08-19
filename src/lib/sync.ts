@@ -59,11 +59,11 @@ async function sincronizarAgora(): Promise<boolean> {
   }
 }
 
-const INTERVALO_MS = 8_000;
+const INTERVALO_MS = 2_000;
 
 /**
  * Mantém a sincronização rodando enquanto a plataforma estiver aberta:
- * uma vez ao entrar, depois a cada ~8s (pausa quando a aba está em
+ * uma vez ao entrar, depois a cada ~2s (pausa quando a aba está em
  * segundo plano, pra não gastar bateria/dados à toa). Monta uma vez só,
  * no AppShell — pra ler o status em outra tela, use `useSyncStatus`.
  */
