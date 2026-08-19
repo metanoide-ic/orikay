@@ -40,15 +40,14 @@ export default function Landing() {
             Quadros, posts, vídeos e financeiro no mesmo lugar, com aprovação e
             publicação automatizadas. Feita para a rotina da agência.
           </p>
+          {/* Plataforma interna da equipe: não existe "criar conta" — as contas
+              são as oficiais da Origem, criadas pelo admin em Equipe. */}
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link to="/entrar">
               <Button size="lg" className="group">
-                Entrar na plataforma
+                Entrar
                 <ArrowRight size={18} className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </Button>
-            </Link>
-            <Link to="/entrar">
-              <Button size="lg" variant="ghost">Criar uma conta</Button>
             </Link>
           </div>
         </div>

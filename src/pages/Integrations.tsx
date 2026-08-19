@@ -105,14 +105,18 @@ export default function Integrations() {
           </div>
           {s.aiMode === 'api' && (
             <>
-              <Field label="Endpoint (compatível com OpenAI)" hint="Ex.: Groq, OpenRouter, OpenAI, Gemini (via proxy OpenAI).">
-                <Input value={s.aiEndpoint} onChange={(e) => s.update({ aiEndpoint: e.target.value })} placeholder="https://api.groq.com/openai/v1/chat/completions" />
+              <Field label="Endpoint (compatível com OpenAI)" hint="OpenAI é o padrão da equipe. Também aceita Groq, OpenRouter, Gemini (via proxy OpenAI).">
+                <Input value={s.aiEndpoint} onChange={(e) => s.update({ aiEndpoint: e.target.value })} placeholder="https://api.openai.com/v1/chat/completions" />
               </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Chave (API key)"><Input type="password" value={s.aiKey} onChange={(e) => s.update({ aiKey: e.target.value })} placeholder="sk-…" /></Field>
-                <Field label="Modelo"><Input value={s.aiModel} onChange={(e) => s.update({ aiModel: e.target.value })} placeholder="llama-3.3-70b-versatile" /></Field>
+                <Field label="Modelo"><Input value={s.aiModel} onChange={(e) => s.update({ aiModel: e.target.value })} placeholder="gpt-4o" /></Field>
               </div>
-              <Note>Groq e OpenRouter têm camadas gratuitas generosas. A chave fica salva só neste navegador.</Note>
+              <Note>
+                A chave vale pra equipe toda: com o Conector configurado, ela se guarda nele e se
+                espalha sozinha pros outros navegadores — cola uma vez, em qualquer dispositivo.
+                Sem Conector, fica salva só neste navegador.
+              </Note>
             </>
           )}
           <Field label="Tom de voz da marca">

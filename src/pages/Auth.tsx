@@ -7,16 +7,17 @@ import { Button, Field, Input } from '@/components/ui';
 import { useAuth } from '@/lib/authStore';
 import { useData } from '@/lib/dataStore';
 
+/**
+ * Tela de entrada — só login. A plataforma é interna da equipe Origem: não
+ * existe "criar conta" público de propósito; conta nova é o admin que cria
+ * em Equipe.
+ */
 export default function Auth() {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const signup = useAuth((s) => s.signup);
   const login = useAuth((s) => s.login);
   const ensureTeam = useAuth((s) => s.ensureTeam);
   const data = useData();
@@ -33,10 +34,7 @@ export default function Auth() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res =
-      mode === 'signup'
-        ? signup({ name, password, role, login: name })
-        : login(identifier, password);
+    const res = login(identifier, password);
 
     setTimeout(() => {
       setLoading(false);
@@ -79,30 +77,15 @@ export default function Auth() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
           <div className="mb-8 lg:hidden"><Logo /></div>
 
-          <h1 className="text-2xl font-semibold text-white">
-            {mode === 'signup' ? 'Criar conta' : 'Entrar'}
-          </h1>
-          <p className="mt-1.5 text-sm text-white/50">
-            {mode === 'signup' ? 'Leva menos de um minuto.' : 'Use seu login e senha da equipe.'}
-          </p>
+          <h1 className="text-2xl font-semibold text-white">Entrar</h1>
+          <p className="mt-1.5 text-sm text-white/50">Use seu login e senha da equipe.</p>
 
           <form onSubmit={submit} className="mt-7 space-y-4">
-            {mode === 'signup' ? (
-              <>
-                <Field label="Nome / login">
-                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Ana Ribeiro" autoFocus />
-                </Field>
-                <Field label="Cargo (opcional)">
-                  <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ex.: Social Media" />
-                </Field>
-              </>
-            ) : (
-              <Field label="Login">
-                <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Ex.: João Paulo" autoFocus autoComplete="username" />
-              </Field>
-            )}
+            <Field label="Login">
+              <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Ex.: João Paulo" autoFocus autoComplete="username" />
+            </Field>
             <Field label="Senha">
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
             </Field>
 
             {error && (
@@ -111,21 +94,13 @@ export default function Auth() {
 
             <Button type="submit" size="lg" className="w-full" disabled={loading}>
               {loading && <Loader2 size={18} className="animate-spin" />}
-              {mode === 'signup' ? 'Criar conta e entrar' : 'Entrar'}
+              Entrar
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-white/50">
-            {mode === 'signup' ? (
-              <>Já tem conta?{' '}
-                <button onClick={() => { setMode('login'); setError(''); }} className="font-medium text-brand-300 hover:text-brand-200">Entrar</button>
-              </>
-            ) : (
-              <>Novo por aqui?{' '}
-                <button onClick={() => { setMode('signup'); setError(''); }} className="font-medium text-brand-300 hover:text-brand-200">Criar conta</button>
-              </>
-            )}
-          </div>
+          <p className="mt-6 text-center text-sm text-white/40">
+            Conta nova? Peça a um admin pra criar em Equipe.
+          </p>
         </motion.div>
       </div>
     </div>

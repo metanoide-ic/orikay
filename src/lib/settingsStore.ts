@@ -46,10 +46,14 @@ interface SettingsState extends Settings {
 }
 
 const defaults: Settings = {
-  aiMode: 'template',
-  aiEndpoint: 'https://api.groq.com/openai/v1/chat/completions',
+  // IA externa (OpenAI) é o padrão da plataforma — a chave em si não fica
+  // aqui (código público!): ela mora no Conector e cada navegador puxa
+  // sozinho na sincronização. Sem chave nenhuma, tudo continua funcionando
+  // com o gerador local (template), como sempre.
+  aiMode: 'api',
+  aiEndpoint: 'https://api.openai.com/v1/chat/completions',
   aiKey: '',
-  aiModel: 'llama-3.3-70b-versatile',
+  aiModel: 'gpt-4o',
   brandVoice:
     'Tom moderno, direto e confiante. Marketing com estratégia e resultado. Não use emojis.',
   publishWebhook: '',
@@ -73,6 +77,23 @@ export const useSettings = create<SettingsState>()(
       ...defaults,
       update: (patch) => set(patch),
     }),
-    { name: 'origem.settings' },
+    {
+      name: 'origem.settings',
+      version: 1,
+      // Navegadores que já existiam antes da OpenAI virar o padrão da
+      // equipe ainda estavam nos padrões antigos do Groq (ou no modo
+      // template) — atualiza pra OpenAI, preservando qualquer endpoint ou
+      // modelo que a pessoa tenha trocado de propósito. Chave já colada
+      // fica intacta.
+      migrate: (persisted) => {
+        const s = (persisted ?? {}) as Partial<Settings>;
+        if (!s.aiEndpoint || s.aiEndpoint === 'https://api.groq.com/openai/v1/chat/completions') {
+          s.aiEndpoint = defaults.aiEndpoint;
+          if (!s.aiModel || s.aiModel === 'llama-3.3-70b-versatile') s.aiModel = defaults.aiModel;
+        }
+        s.aiMode = 'api';
+        return s as SettingsState;
+      },
+    },
   ),
 );

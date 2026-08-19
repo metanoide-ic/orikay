@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Trash2, Plus, X, Check, Link2, ExternalLink } from 'lucide-react';
+import { Trash2, Plus, X, Check, Link2, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
 import { Modal, Button, Field, Input, Textarea, Select, SearchSelect, AttachmentsGallery } from './ui';
 import { RevisionList } from './RevisionList';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
+import { generateVideoScript } from '@/lib/ai';
 import { VIDEO_STAGE_META, VIDEO_STAGE_ORDER } from '@/lib/labels';
 import { uid, cn } from '@/lib/utils';
 
@@ -21,8 +22,19 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
   const [ck, setCk] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [genLoading, setGenLoading] = useState(false);
 
   if (!video) return null;
+
+  /** Gera o roteiro (gancho, cenas, CTA) com a IA e coloca na Descrição — sem apagar o que já foi escrito. */
+  async function genRoteiro() {
+    if (!video || genLoading) return;
+    setGenLoading(true);
+    const client = clients.find((c) => c.id === video.clientId);
+    const roteiro = await generateVideoScript(video, client);
+    update(videoId, { notes: video.notes?.trim() ? `${video.notes.trim()}\n\n${roteiro}` : roteiro });
+    setGenLoading(false);
+  }
 
   const anexos = video.mediaUrls ?? (video.mediaUrl ? [video.mediaUrl] : []);
   function addAnexos(novos: string[]) {
@@ -43,7 +55,13 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
 
         {/* Descrição — o que o designer/editor precisa ler primeiro pra saber o que produzir. */}
         <div className="rounded-2xl border border-brand-400/25 bg-brand-500/[0.06] p-4">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-brand-300">Descrição — o que produzir</div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-brand-300">Descrição — o que produzir</span>
+            <Button size="sm" variant="soft" onClick={genRoteiro} disabled={genLoading}>
+              {genLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              Gerar roteiro com IA
+            </Button>
+          </div>
           <Textarea
             value={video.notes ?? ''}
             onChange={(e) => update(videoId, { notes: e.target.value })}

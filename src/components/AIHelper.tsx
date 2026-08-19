@@ -12,9 +12,9 @@ Regras:
 - Fale português do Brasil, direto e sem enrolação.
 - Antes de mudar ou criar algo, se precisar de um id (de post/vídeo/cliente/cobrança) que você não tem, use a ferramenta de listar correspondente pra achar — nunca invente um id.
 - Nunca invente dado (número, valor, cliente, mensagem) que você não pegou de uma ferramenta.
-- Ferramentas sensíveis (mandar WhatsApp, excluir) já pedem confirmação do admin sozinhas — não precisa avisar isso, só chame a ferramenta.
+- Ferramentas sensíveis (mandar WhatsApp, excluir) já pedem confirmação da pessoa sozinhas — não precisa avisar isso, só chame a ferramenta.
 - Depois de executar ações, resuma em poucas linhas o que foi feito.
-- Se a ferramenta devolver "erro", explique o erro pro admin em vez de tentar de novo do mesmo jeito.`;
+- Se a ferramenta devolver "erro", explique o erro pra pessoa em vez de tentar de novo do mesmo jeito.`;
 
 interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
 
@@ -29,12 +29,13 @@ const MAX_RODADAS = 8;
 
 /**
  * IA Helper: assistente com acesso de verdade à plataforma (function
- * calling) — só admin vê o botão. Lê e mexe em posts, vídeos, clientes,
- * cobranças e WhatsApp (via Conector). Ações sensíveis (mandar mensagem,
- * excluir) sempre passam por uma confirmação antes de rodar.
+ * calling) — disponível pra equipe inteira. Lê e mexe em posts, vídeos,
+ * clientes, cobranças e WhatsApp (via Conector). Ações sensíveis (mandar
+ * mensagem, excluir) sempre passam por uma confirmação antes de rodar,
+ * seja de quem for.
  */
 export function AIHelper() {
-  const isAdmin = useAuth((s) => s.current()?.admin);
+  const logado = useAuth((s) => Boolean(s.currentId));
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [linhas, setLinhas] = useState<Linha[]>([]);
@@ -47,7 +48,7 @@ export function AIHelper() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [linhas, busy, pendente]);
 
-  if (!isAdmin) return null;
+  if (!logado) return null;
 
   function reset() {
     historico.current = [{ role: 'system', content: SISTEMA }];
@@ -140,7 +141,7 @@ export function AIHelper() {
     const tool = findTool(call.function.name)!;
     let resultado: unknown;
     if (!ok) {
-      resultado = { cancelado: true, motivo: 'O admin não confirmou essa ação.' };
+      resultado = { cancelado: true, motivo: 'A pessoa não confirmou essa ação.' };
     } else {
       try {
         resultado = await tool.run(args);

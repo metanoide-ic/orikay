@@ -158,6 +158,60 @@ export async function generatePlanIdeas(
   }
 }
 
+/** Roteiro local (sem IA) — estrutura pronta pra preencher, nunca página em branco. */
+function templateRoteiro(titulo: string, client?: Client): string {
+  const marca = client?.name ?? 'o cliente';
+  return (
+    `GANCHO (primeiros 3s): abra já no assunto de "${titulo}" — sem introdução longa.\n\n` +
+    `CENA 1: mostre o contexto real da ${marca} (local, produto ou equipe).\n` +
+    `CENA 2: desenvolva o tema em 2-3 frases curtas, linguagem falada.\n` +
+    `CENA 3: feche com o resultado ou a solução.\n\n` +
+    `CTA: convite direto — chamar no WhatsApp, visitar ou seguir o perfil.`
+  );
+}
+
+/**
+ * Gera o roteiro de um vídeo (Reels/TikTok) com a IA configurada — gancho,
+ * cenas numeradas com o que gravar e o que dizer, e CTA. Sem IA (ou em
+ * erro), devolve o esqueleto local pra preencher.
+ */
+export async function generateVideoScript(video: { title: string; notes?: string }, client?: Client): Promise<string> {
+  const s = useSettings.getState();
+  if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) return templateRoteiro(video.title, client);
+  try {
+    const prompt =
+      `Você é roteirista de vídeos curtos (Reels/TikTok) da agência Origem. Escreva o ROTEIRO de um vídeo.\n` +
+      `Tom de voz da marca: ${s.brandVoice || 'moderno, direto e confiante'}.\n` +
+      `Cliente: ${client?.name || 'Origem'}.\n` +
+      (client?.briefing ? `Sobre o cliente (use só o que está aqui, não invente fatos): ${client.briefing}\n` : '') +
+      `Tema do vídeo: ${video.title}.\n` +
+      (video.notes ? `Anotações já existentes: ${video.notes}\n` : '') +
+      `Estruture assim: GANCHO (o que aparece e o que é dito nos primeiros 3 segundos), ` +
+      `CENAS numeradas (pra cada uma: o que gravar + o que falar, em linguagem falada natural), e CTA final. ` +
+      `Português do Brasil, sem emojis, direto. Devolva só o roteiro.`;
+    const res = await fetch(s.aiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.aiKey}` },
+      body: JSON.stringify({
+        model: s.aiModel,
+        messages: [
+          { role: 'system', content: 'Você é um roteirista sênior de vídeos curtos para redes sociais.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 700,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const text: string | undefined = data?.choices?.[0]?.message?.content;
+    if (!text) throw new Error('Resposta vazia da IA');
+    return text.trim();
+  } catch {
+    return templateRoteiro(video.title, client);
+  }
+}
+
 /**
  * Transforma uma instrução curta ("avisa que amanhã é feriado e não tem
  * postagem") numa mensagem de WhatsApp pronta pra mandar. Sem IA configurada,

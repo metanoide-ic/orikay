@@ -55,6 +55,16 @@ const CONFIG_PADRAO = {
   tunelAutomatico: true,
   /** Data (ISO, segunda-feira) da última pergunta semanal da Terça da Sorte já enviada — pra nunca perguntar duas vezes na mesma semana. */
   tercaDaSorteUltimoEnvio: '',
+  /**
+   * IA da equipe (OpenAI ou compatível): a chave fica gravada AQUI, no
+   * conector.config.json (fora do Git de propósito — chave em repositório
+   * público é revogada e roubada), e cada navegador da equipe puxa sozinho
+   * na sincronização. Cola uma vez, em qualquer dispositivo, e a IA passa a
+   * funcionar pra todo mundo.
+   */
+  iaEndpoint: '',
+  iaChave: '',
+  iaModelo: '',
 };
 
 function lerConfig() {
@@ -875,19 +885,62 @@ async function receberMensagem(corpo) {
 /** Eventos do gateway que significam dinheiro na conta. */
 const PAGOU = new Set(['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED']);
 
+const MESES_PT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
 function receberPagamento(corpo) {
   if (!PAGOU.has(corpo.event)) return null;
   const p = corpo.payment || {};
   const chargeId = p.externalReference;
   if (!chargeId) return null;
 
+  // Aplica direto no estado compartilhado da equipe (o mesmo da
+  // sincronização): a cobrança vira "paga" e a receita entra no caixa aqui
+  // mesmo, e o sync leva pra todo mundo em segundos. Antes isso ia pra fila
+  // `decisoes`, consumida UMA única vez pelo primeiro navegador que
+  // buscasse — com a equipe toda usando ao mesmo tempo virou corrida: o
+  // navegador "errado" (sem a cobrança carregada) drenava a fila e o
+  // pagamento se perdia pra sempre; reiniciar o Conector também apagava a
+  // fila. Era por isso que cliente pagava e a plataforma não marcava.
+  const cobranca = dadosCompartilhados.charges.find((c) => c.id === chargeId);
+  if (cobranca) {
+    if (cobranca.status === 'paga') {
+      registrar('pagamento', `pagamento confirmado (${p.value ?? '?'}) para cobrança já paga (${chargeId}) — nada a fazer`);
+      return 'pago';
+    }
+    const agora = Date.now();
+    cobranca.status = 'paga';
+    cobranca.paidAt = agora;
+    cobranca.updatedAt = agora;
+    const cliente = dadosCompartilhados.clients.find((c) => c.id === cobranca.clientId);
+    const [ano, mes] = String(cobranca.month || '').split('-');
+    const rotuloMes = MESES_PT[Number(mes) - 1] ? `${MESES_PT[Number(mes) - 1]} de ${ano}` : cobranca.month;
+    dadosCompartilhados.transactions.unshift({
+      id: 'tx_' + Math.random().toString(36).slice(2, 13),
+      type: 'receita',
+      description: `Fee mensal: ${cliente?.name ?? 'cliente'} (${rotuloMes})`,
+      amount: Number(p.value) || cobranca.amount,
+      category: 'Contrato',
+      clientId: cobranca.clientId,
+      date: new Date().toISOString().slice(0, 10),
+      status: 'pago',
+      createdAt: agora,
+      updatedAt: agora,
+    });
+    gravarDadosCompartilhados();
+    registrar('pagamento', `pagamento confirmado (${p.value ?? '?'}): cobrança de ${cliente?.name ?? chargeId} marcada como paga e receita lançada no caixa`);
+    return 'pago';
+  }
+
+  // Cobrança ainda não sincronizada pra cá (equipe nunca abriu a plataforma
+  // com o Conector configurado): cai no caminho antigo — fila que a
+  // plataforma busca em /decisoes — pra não perder o aviso.
   decisoes.push({
     tipo: 'pagamento',
     chargeId,
     valor: Number(p.value) || 0,
     quando: Date.now(),
   });
-  registrar('pagamento', `pagamento confirmado (${p.value ?? '?'}) para a cobrança ${chargeId}`);
+  registrar('pagamento', `pagamento confirmado (${p.value ?? '?'}) para a cobrança ${chargeId} (aguardando a plataforma buscar)`);
   return 'pago';
 }
 
@@ -1205,6 +1258,28 @@ const servidor = createServer(async (req, res) => {
   if (url.pathname === '/dados' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, dados: dadosCompartilhados }));
+  }
+
+  // Configuração de IA compartilhada da equipe: a chave mora aqui (no
+  // conector.config.json, que não vai pro Git) e cada navegador se acerta
+  // sozinho na sincronização — colou a chave uma vez em qualquer
+  // dispositivo, todo mundo passa a usar a IA.
+  if (url.pathname === '/config-ia' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      ok: true,
+      ia: { endpoint: config.iaEndpoint || '', chave: config.iaChave || '', modelo: config.iaModelo || '' },
+    }));
+  }
+  if (url.pathname === '/config-ia' && req.method === 'POST') {
+    const b = await corpo(req);
+    if (typeof b.chave === 'string') config.iaChave = b.chave.trim();
+    if (typeof b.endpoint === 'string') config.iaEndpoint = b.endpoint.trim();
+    if (typeof b.modelo === 'string') config.iaModelo = b.modelo.trim();
+    gravarConfig(config);
+    registrar('config', 'configuração de IA da equipe atualizada');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true }));
   }
   if (url.pathname === '/dados' && req.method === 'POST') {
     try {

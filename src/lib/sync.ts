@@ -59,6 +59,46 @@ async function sincronizarAgora(): Promise<boolean> {
   }
 }
 
+/**
+ * A chave da IA (OpenAI) é da equipe inteira: fica guardada no Conector
+ * (arquivo local dele, fora do Git — chave em repositório público é
+ * revogada e roubada) e cada navegador se acerta sozinho aqui — quem não
+ * tem chave puxa a da equipe; quem acabou de colar uma chave nova empurra
+ * pra equipe toda. Colou UMA vez, em qualquer dispositivo, e a IA passa a
+ * funcionar pra todo mundo.
+ */
+async function reconciliarChaveIA(): Promise<void> {
+  const s = useSettings.getState();
+  if (!s.connectorUrl) return;
+  try {
+    const res = await fetch(connectorPath(s.connectorUrl, '/config-ia'));
+    const data = await res.json();
+    if (!data?.ok) return;
+    const remota = (data.ia ?? {}) as { endpoint?: string; chave?: string; modelo?: string };
+
+    if (!s.aiKey && remota.chave) {
+      // Este navegador ainda não tem chave — puxa a da equipe.
+      s.update({
+        aiMode: 'api',
+        aiKey: remota.chave,
+        aiEndpoint: remota.endpoint || s.aiEndpoint,
+        aiModel: remota.modelo || s.aiModel,
+      });
+      return;
+    }
+    if (s.aiKey && (remota.chave !== s.aiKey || remota.endpoint !== s.aiEndpoint || remota.modelo !== s.aiModel)) {
+      // Este navegador tem uma chave/configuração mais nova — empurra pra equipe.
+      await fetch(connectorPath(s.connectorUrl, '/config-ia'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chave: s.aiKey, endpoint: s.aiEndpoint, modelo: s.aiModel }),
+      });
+    }
+  } catch {
+    // Conector fora do ar: sem drama, tenta de novo na próxima abertura.
+  }
+}
+
 const INTERVALO_MS = 3_000;
 
 /**
@@ -72,7 +112,17 @@ const INTERVALO_MS = 3_000;
  */
 export function useLiveSync(): void {
   const connectorUrl = useSettings((s) => s.connectorUrl);
+  const aiKey = useSettings((s) => s.aiKey);
   const emAndamento = useRef(false);
+
+  // Acerta a chave da IA com a equipe: na entrada e sempre que a chave
+  // local mudar (com um respiro de 1,2s pra não disparar a cada tecla
+  // digitada no campo de Integrações).
+  useEffect(() => {
+    if (!connectorUrl) return;
+    const id = setTimeout(() => { void reconciliarChaveIA(); }, 1_200);
+    return () => clearTimeout(id);
+  }, [connectorUrl, aiKey]);
 
   useEffect(() => {
     if (!connectorUrl) return;
