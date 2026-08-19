@@ -13,19 +13,26 @@ Tudo é conectado em **Integrações**, dentro do app.
 
 ---
 
-## 1. IA para as copies (opcional — já funciona sem)
+## 1. IA para as copies (OpenAI — já vem configurada, só falta a chave)
 
-Por padrão as copies são geradas por um **gerador local grátis e ilimitado**.
-Para textos mais inteligentes:
+A plataforma já vem apontando pra **OpenAI (`gpt-4o`)** — copies dos posts,
+planejamento mensal (tema, legenda e texto da arte), roteiros de vídeo e a
+IA Helper usam todos essa mesma configuração. A chave é colada **uma vez
+só, por uma pessoa qualquer da equipe**:
 
-1. Crie uma conta gratuita na **Groq** (`console.groq.com`) ou **OpenRouter**.
-2. Gere uma **API key**.
-3. Em **Integrações → IA para copies**, escolha **"IA externa (API)"** e cole:
-   - **Endpoint:** `https://api.groq.com/openai/v1/chat/completions`
-   - **Chave:** sua API key
-   - **Modelo:** `llama-3.3-70b-versatile` (ou outro do provedor)
+1. Gere uma API key em `platform.openai.com/api-keys` (a API é cobrada por
+   uso, separada da assinatura do ChatGPT).
+2. Em **Integrações → IA para copies**, cole a chave no campo **Chave**.
+3. Pronto: com o Conector configurado, a chave se guarda nele
+   (`conector.config.json`, que não vai pro Git) e **se espalha sozinha**
+   pra todos os navegadores da equipe na sincronização.
 
-A chave fica salva só no seu navegador/computador.
+> Por que a chave não vai direto no código? O site (orikay.com.br) e o
+> repositório são públicos — chave da OpenAI em código público é revogada
+> automaticamente em minutos e pode ser roubada (e gasta na sua conta).
+> No Conector, ela fica só na máquina de vocês.
+
+Sem chave nenhuma, tudo continua funcionando com o gerador local grátis.
 
 ---
 
