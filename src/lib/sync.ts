@@ -59,13 +59,16 @@ async function sincronizarAgora(): Promise<boolean> {
   }
 }
 
-const INTERVALO_MS = 2_000;
+const INTERVALO_MS = 3_000;
 
 /**
  * Mantém a sincronização rodando enquanto a plataforma estiver aberta:
- * uma vez ao entrar, depois a cada ~2s (pausa quando a aba está em
- * segundo plano, pra não gastar bateria/dados à toa). Monta uma vez só,
- * no AppShell — pra ler o status em outra tela, use `useSyncStatus`.
+ * uma vez ao entrar (manda de cara tudo que o dispositivo já tinha
+ * localmente, mesmo o que foi criado antes de existir sincronização —
+ * o Conector mescla com o resto da equipe e devolve a verdade
+ * combinada), depois a cada ~3s (pausa quando a aba está em segundo
+ * plano, pra não gastar bateria/dados à toa). Monta uma vez só, no
+ * AppShell — pra ler o status em outra tela, use `useSyncStatus`.
  */
 export function useLiveSync(): void {
   const connectorUrl = useSettings((s) => s.connectorUrl);
