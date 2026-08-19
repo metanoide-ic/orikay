@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { ClientFilter } from '@/components/ClientFilter';
-import { Button, Badge, Avatar, Select } from '@/components/ui';
+import { Button, Badge, Avatar, Select, comprimirImagem } from '@/components/ui';
 import { PostsCalendar } from '@/components/PostsCalendar';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
 import { useData } from '@/lib/dataStore';
@@ -73,16 +73,15 @@ export default function Posts() {
   const [dateTargetId, setDateTargetId] = useState<string | null>(null);
 
   function onCapaFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+    const files = e.target.files;
+    const targetId = capaTargetId;
     e.target.value = '';
-    if (!f || !capaTargetId) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const p = posts.find((x) => x.id === capaTargetId);
+    if (!files || files.length === 0 || !targetId) return;
+    Promise.all(Array.from(files).map(comprimirImagem)).then((novas) => {
+      const p = posts.find((x) => x.id === targetId);
       const resto = (p?.mediaUrls ?? (p?.mediaUrl ? [p.mediaUrl] : [])).filter((u) => u !== undefined);
-      updatePost(capaTargetId, { mediaUrls: [String(reader.result), ...resto], mediaUrl: undefined });
-    };
-    reader.readAsDataURL(f);
+      updatePost(targetId, { mediaUrls: [...novas.filter(Boolean), ...resto], mediaUrl: undefined });
+    });
   }
 
   // As colunas podem ser arrastadas de lugar (o usuário decide a ordem que
@@ -423,7 +422,7 @@ export default function Posts() {
       {openId && <PostModal postId={openId} onClose={() => setOpenId(null)} />}
 
       {/* Inputs escondidos usados pelo menu de botão direito (alterar capa / editar data). */}
-      <input ref={capaFileRef} type="file" accept="image/*" hidden onChange={onCapaFile} />
+      <input ref={capaFileRef} type="file" accept="image/*" multiple hidden onChange={onCapaFile} />
       <input
         ref={dateInputRef}
         type="date"

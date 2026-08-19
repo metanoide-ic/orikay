@@ -274,6 +274,56 @@ export function Switch({
  * pra ver grande, "Definir como capa" reordena, X remove. Aceita mandar
  * várias imagens de uma vez.
  */
+/**
+ * Redimensiona e recomprime pra JPEG antes de guardar — sem isso, uma foto
+ * de celular (facilmente 3-8MB, sem compressão nenhuma) enche o espaço do
+ * navegador rápido e, pior, estoura o limite de tamanho da sincronização
+ * entre a equipe (o conjunto de imagens de todo mundo é mandado pro
+ * Conector inteiro a cada sincronização) — a partir de um certo tamanho
+ * combinado a sincronização simplesmente para de funcionar pra todo mundo,
+ * sem aviso nenhum na tela, o que parecia (mas não era) um bloqueio de
+ * permissão pra quem não é admin. Imagem já pequena (ex.: print, arte em
+ * PNG) passa direto, sem perder qualidade nem transparência.
+ */
+const TAMANHO_MAX_SEM_COMPACTAR = 600 * 1024; // 600KB
+const DIMENSAO_MAX = 1600; // maior lado, em pixels
+
+export function comprimirImagem(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    if (file.size <= TAMANHO_MAX_SEM_COMPACTAR) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const original = String(reader.result);
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > DIMENSAO_MAX || height > DIMENSAO_MAX) {
+          const escala = DIMENSAO_MAX / Math.max(width, height);
+          width = Math.round(width * escala);
+          height = Math.round(height * escala);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(original); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => resolve(original);
+      img.src = original;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
+
 export function AttachmentsGallery({
   items,
   onAdd,
@@ -291,15 +341,7 @@ export function AttachmentsGallery({
   function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const readers = Array.from(files).map(
-      (f) =>
-        new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.readAsDataURL(f);
-        }),
-    );
-    Promise.all(readers).then(onAdd);
+    Promise.all(Array.from(files).map(comprimirImagem)).then((urls) => onAdd(urls.filter(Boolean)));
     e.target.value = '';
   }
 

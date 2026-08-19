@@ -1111,11 +1111,24 @@ function cors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+// O estado compartilhado da equipe (posts, vídeos etc.) carrega as imagens
+// junto, em base64 — por isso o limite aqui precisa ser generoso: 5MB
+// travava a sincronização de todo mundo assim que a equipe acumulava
+// algumas fotos, sem erro nenhum na tela (parecia bug de permissão, não
+// era). Com a compressão de imagem no navegador antes de guardar, isso
+// deve raramente chegar perto do limite — mas ele existe pra não deixar
+// a memória do processo crescer sem controle com uma requisição absurda.
 function corpo(req) {
   return new Promise((resolve) => {
     let dados = '';
-    req.on('data', (p) => { dados += p; if (dados.length > 5e6) req.destroy(); });
+    let estourou = false;
+    req.on('data', (p) => {
+      if (estourou) return;
+      dados += p;
+      if (dados.length > 40e6) { estourou = true; req.destroy(); }
+    });
     req.on('end', () => {
+      if (estourou) { resolve({}); return; } // mesmo padrão de "corpo malformado" abaixo — nunca null
       try { resolve(JSON.parse(dados || '{}')); } catch { resolve({}); }
     });
   });

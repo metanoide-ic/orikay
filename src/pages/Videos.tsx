@@ -13,7 +13,7 @@ import {
   GripVertical, ImageIcon, ImageUp, CalendarClock, Archive, ArchiveRestore,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { Button, Field, Input, Modal, Select } from '@/components/ui';
+import { Button, Field, Input, Modal, Select, comprimirImagem } from '@/components/ui';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
@@ -59,16 +59,15 @@ export default function Videos() {
   const [dateTargetId, setDateTargetId] = useState<string | null>(null);
 
   function onCapaFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+    const files = e.target.files;
+    const targetId = capaTargetId;
     e.target.value = '';
-    if (!f || !capaTargetId) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const v = videos.find((x) => x.id === capaTargetId);
+    if (!files || files.length === 0 || !targetId) return;
+    Promise.all(Array.from(files).map(comprimirImagem)).then((novas) => {
+      const v = videos.find((x) => x.id === targetId);
       const resto = (v?.mediaUrls ?? (v?.mediaUrl ? [v.mediaUrl] : [])).filter((u) => u !== undefined);
-      updateVideo(capaTargetId, { mediaUrls: [String(reader.result), ...resto], mediaUrl: undefined });
-    };
-    reader.readAsDataURL(f);
+      updateVideo(targetId, { mediaUrls: [...novas.filter(Boolean), ...resto], mediaUrl: undefined });
+    });
   }
 
   // Seleção múltipla ao estilo Windows: Ctrl/Cmd+clique soma, Shift+clique
@@ -351,7 +350,7 @@ export default function Videos() {
 
       {openId && <VideoModal videoId={openId} onClose={() => setOpenId(null)} />}
 
-      <input ref={capaFileRef} type="file" accept="image/*" hidden onChange={onCapaFile} />
+      <input ref={capaFileRef} type="file" accept="image/*" multiple hidden onChange={onCapaFile} />
       <input
         ref={dateInputRef}
         type="date"
