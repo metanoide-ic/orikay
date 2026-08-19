@@ -50,17 +50,22 @@ export default function Clients() {
   const [batchBusy, setBatchBusy] = useState(false);
 
   /**
-   * Gera o mês inteiro da carteira de uma vez. Só entra quem tem cadência:
-   * agentes Omni (conteúdo vem do Banco Omni) e clientes sob demanda ficam
-   * de fora por definição, não por esquecimento.
+   * Gera o mês da carteira de uma vez. Só entra quem tem cadência: agentes
+   * Omni (conteúdo vem do Banco Omni) e clientes sob demanda ficam de fora
+   * por definição, não por esquecimento. `modo: 'restante'` gera só do dia
+   * de hoje até o fim do mês corrente (pra completar o que falta de agora
+   * em diante); `'proximo'` gera o mês seguinte inteiro, como sempre foi.
    */
-  async function gerarMesDeTodos() {
+  async function gerarMesDeTodos(modo: 'proximo' | 'restante') {
     if (batchBusy) return;
+    const hoje = new Date();
     const alvoData = new Date();
-    alvoData.setMonth(alvoData.getMonth() + 1); // sempre o mês seguinte
+    if (modo === 'proximo') alvoData.setMonth(alvoData.getMonth() + 1);
     const year = alvoData.getFullYear();
     const month = alvoData.getMonth();
+    const fromDay = modo === 'restante' ? hoje.getDate() : 1;
     const label = alvoData.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const periodo = modo === 'restante' ? `de hoje até o fim de ${label}` : label;
 
     const comCadencia = clients.filter((c) => Object.keys(c.weeklyPlan ?? {}).length > 0);
     if (comCadencia.length === 0) { setBatchMsg('Nenhum cliente com cadência semanal preenchida.'); return; }
@@ -68,19 +73,19 @@ export default function Clients() {
     setBatchBusy(true);
     let posts = 0, videos = 0, feitos = 0;
     for (const c of comCadencia) {
-      const slots = buildClientSlots(c, year, month);
+      const slots = buildClientSlots(c, year, month, fromDay);
       if (slots.length === 0) continue;
-      // Com IA externa ligada, tema e copy saem do briefing; sem ela, do template local.
+      // Com IA externa ligada, tema, copy e arte saem do briefing; sem ela, do template local.
       const ideas = await generatePlanIdeas(c, slots);
-      const itens = ideas ? slots.map((slot, i) => ({ ...slot, title: ideas[i]?.title ?? slot.title, caption: ideas[i]?.caption ?? slot.caption })) : slots;
+      const itens = ideas ? slots.map((slot, i) => ({ ...slot, title: ideas[i]?.title ?? slot.title, caption: ideas[i]?.caption ?? slot.caption, arte: ideas[i]?.arte ?? slot.arte })) : slots;
       const r = applyPlanToWorkspace(c, itens);
       posts += r.posts; videos += r.videos; feitos++;
     }
     setBatchBusy(false);
     setBatchMsg(
       posts + videos === 0
-        ? `O mês de ${label} já estava planejado: nada novo a criar. Rodar de novo não duplica.`
-        : `Planejamento de ${label} gerado para ${feitos} cliente(s): ` +
+        ? `O período ${periodo} já estava planejado: nada novo a criar. Rodar de novo não duplica.`
+        : `Planejamento ${periodo} gerado para ${feitos} cliente(s): ` +
           `${posts} post(s) e ${videos} vídeo(s). ` +
           `Quem não tem cadência (agentes Omni e clientes sob demanda) ficou de fora de propósito.`,
     );
@@ -181,7 +186,11 @@ export default function Clients() {
             <Button variant="outline" onClick={() => { setOmniResult(''); setOmniOpen(true); }}>
               <Send size={16} /> Falar com as Omnis
             </Button>
-            <Button variant="outline" onClick={gerarMesDeTodos} disabled={batchBusy}>
+            <Button variant="outline" onClick={() => gerarMesDeTodos('restante')} disabled={batchBusy}>
+              {batchBusy ? <Loader2 size={16} className="animate-spin" /> : <CalendarRange size={16} />}
+              Gerar o resto deste mês
+            </Button>
+            <Button variant="outline" onClick={() => gerarMesDeTodos('proximo')} disabled={batchBusy}>
               {batchBusy ? <Loader2 size={16} className="animate-spin" /> : <CalendarRange size={16} />}
               Gerar mês de todos
             </Button>

@@ -61,17 +61,44 @@ function buildPrompt(post: Post, client?: Client, brandVoice?: string): string {
 export interface PlanIdea {
   title: string;
   caption: string;
+  /** Texto pra escrever na arte/capa — headline (+ subheadline numa segunda linha), ou a sequência de slides quando é carrossel. */
+  arte: string;
 }
 
 /**
- * Melhora o planejamento mensal com a IA configurada: gera tema E copy/roteiro
- * completo por slot, com base real no briefing do cliente — sem IA configurada
- * (ou em erro), devolve null e quem chamou usa o conteúdo local (template) já
- * pronto no próprio slot.
+ * Textos de referência de peças que já saem boas por aqui — servem de
+ * régua de qualidade pra IA imitar o tom e a estrutura (headline curta e
+ * direta, subheadline de apoio, carrossel em sequência de slides que cria
+ * tensão e resolve no fim), nunca o conteúdo em si (que é de outro cliente).
+ */
+const EXEMPLOS_DE_ARTE = `
+Exemplo 1 — peça única (headline + subheadline):
+Headline: IMÓVEL PARADO TAMBÉM GERA CUSTO.
+Subheadline: Gestão certa transforma imóvel em resultado.
+
+Exemplo 2 — peça única (headline + subheadline):
+Headline: DOWNLOAD RÁPIDO, MAS O JOGO TRAVA?
+Subheadline: O problema pode não ser a velocidade. Pode ser o ping.
+
+Exemplo 3 — carrossel de 6 slides, construindo uma pergunta até resolver:
+Slide 1 — Capa: PARA-BRISA TRINCADO: TROCAR OU REPARAR? / Apoio: Veja o que avaliar.
+Slide 2: O TAMANHO IMPORTA / Apoio: Nem toda trinca exige troca.
+Slide 3: ONDE ESTÁ A TRINCA? / Apoio: A localização muda tudo.
+Slide 4: E A PROFUNDIDADE? / Apoio: O dano precisa ser avaliado.
+Slide 5: REPARO OU TROCA? / Apoio: A avaliação dá a resposta.
+Slide 6 — Fechamento: NÃO DEIXE A TRINCA AUMENTAR. / Apoio: Procure a [nome do cliente].
+`.trim();
+
+/**
+ * Melhora o planejamento mensal com a IA configurada: gera tema, copy/roteiro
+ * E o texto da arte/capa (headline + subheadline, ou a sequência de slides
+ * pra carrossel) completo por slot, com base real no briefing do cliente —
+ * sem IA configurada (ou em erro), devolve null e quem chamou usa o
+ * conteúdo local (template) já pronto no próprio slot.
  */
 export async function generatePlanIdeas(
   client: Client,
-  slots: Array<{ date: string; type: string; holiday?: string; title: string; caption?: string; recentTitles?: string[] }>,
+  slots: Array<{ date: string; type: string; holiday?: string; title: string; caption?: string; arte?: string; recentTitles?: string[] }>,
 ): Promise<PlanIdea[] | null> {
   const s = useSettings.getState();
   if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) return null;
@@ -93,8 +120,14 @@ export async function generatePlanIdeas(
       `- Não invente números, prêmios, depoimentos ou fatos que não estejam no briefing. Se faltar informação, escreva algo genérico mas honesto (sem fingir dado concreto).\n` +
       `- Para formato de vídeo, "legenda" é o ROTEIRO completo (gancho, conteúdo, CTA). Para foto/post, é a legenda pronta pra publicar.\n` +
       `- Sem emojis. Português do Brasil. CTA claro no fim.\n\n` +
+      `Além de "titulo" e "legenda", cada item também precisa de "arte": o texto que vai escrito na peça (a capa), diferente da legenda. Nunca deixe colchete, placeholder ou frase solta genérica tipo "CURIOSIDADE" sozinha — sempre uma headline completa e direta, com uma subheadline curta de apoio (uma frase). Veja o padrão de qualidade esperado, com exemplos reais de peças boas que já saem daqui (o conteúdo é de outro cliente, use só a estrutura e o tom):\n\n` +
+      `${EXEMPLOS_DE_ARTE}\n\n` +
+      `Regras pro campo "arte":\n` +
+      `- Formato "Carrossel": monte a sequência completa de slides (normalmente 4 a 6), no formato "Slide 1 — Capa: HEADLINE / Apoio: subheadline curta.\\nSlide 2: ...", cada slide com uma headline curta em caixa alta e uma linha de apoio, construindo uma pergunta ou tensão que se resolve no último slide (que fecha com o nome do cliente).\n` +
+      `- Outros formatos (Post, Stories, Foto): duas linhas só — a headline em caixa alta, quebra de linha, e a subheadline curta.\n` +
+      `- Headline sempre em CAIXA ALTA, curta (até ~8 palavras), direta, sem enrolação. Subheadline em frase normal, uma linha.\n\n` +
       `Itens do mês:\n${listado}\n\n` +
-      `Responda SOMENTE com um JSON array (sem markdown, sem texto fora do array), na mesma ordem e quantidade dos itens, cada elemento assim: {"titulo": "...", "legenda": "..."}`;
+      `Responda SOMENTE com um JSON array (sem markdown, sem texto fora do array), na mesma ordem e quantidade dos itens, cada elemento assim: {"titulo": "...", "legenda": "...", "arte": "..."}`;
     const res = await fetch(s.aiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.aiKey}` },
@@ -105,7 +138,7 @@ export async function generatePlanIdeas(
           { role: 'user', content: prompt },
         ],
         temperature: 0.7,
-        max_tokens: 4000,
+        max_tokens: 5000,
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -113,11 +146,12 @@ export async function generatePlanIdeas(
     const text: string = data?.choices?.[0]?.message?.content ?? '';
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('resposta sem JSON');
-    const parsed = JSON.parse(jsonMatch[0]) as Array<{ titulo?: string; legenda?: string }>;
+    const parsed = JSON.parse(jsonMatch[0]) as Array<{ titulo?: string; legenda?: string; arte?: string }>;
     if (parsed.length < slots.length) throw new Error('resposta incompleta');
     return slots.map((x, i) => ({
       title: parsed[i]?.titulo?.trim() ? `${x.type}: ${parsed[i].titulo!.trim()}` : x.title,
       caption: parsed[i]?.legenda?.trim() || x.caption || '',
+      arte: parsed[i]?.arte?.trim() || x.arte || '',
     }));
   } catch {
     return null;

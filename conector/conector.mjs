@@ -53,6 +53,8 @@ const CONFIG_PADRAO = {
   entradaToken: '',
   /** Liga o túnel sozinho ao abrir o conector. */
   tunelAutomatico: true,
+  /** Data (ISO, segunda-feira) da última pergunta semanal da Terça da Sorte já enviada — pra nunca perguntar duas vezes na mesma semana. */
+  tercaDaSorteUltimoEnvio: '',
 };
 
 function lerConfig() {
@@ -213,6 +215,75 @@ async function enviarWhatsapp(numero, mensagem) {
   });
   if (!res.ok) throw new Error(`Evolution respondeu ${res.status}: ${(await res.text()).slice(0, 160)}`);
 }
+
+/* --------------------- Pergunta semanal da Terça da Sorte --------------------- */
+
+/**
+ * A Rede de Postos Margarida tem a promoção "Terça da Sorte" toda semana —
+ * antes de produzir a arte de segunda, alguém da equipe precisa perguntar
+ * pro cliente os valores daquela semana. Isso vivia só na memória de quem
+ * lembrasse; agora o Conector pergunta sozinho: toda segunda-feira, a
+ * partir das 9h (horário de Brasília), manda a pergunta pro grupo do
+ * WhatsApp desse cliente — uma vez só por semana, mesmo reiniciando o
+ * Conector várias vezes no mesmo dia.
+ */
+const NOME_CLIENTE_TERCA_DA_SORTE = 'Rede de Postos Margarida';
+
+function normalizarNomeSimples(s) {
+  return (s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .trim().toLowerCase();
+}
+
+/** Data/hora atual no fuso de Brasília, sem depender do fuso do servidor onde o Conector está hospedado. */
+function agoraEmSaoPaulo() {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
+    }).formatToParts(new Date()).map((p) => [p.type, p.value]),
+  );
+  const diaSemanaMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    data: `${partes.year}-${partes.month}-${partes.day}`,
+    diaSemana: diaSemanaMap[partes.weekday],
+    hora: Number(partes.hour),
+  };
+}
+
+async function verificarTercaDaSorte() {
+  const { data, diaSemana, hora } = agoraEmSaoPaulo();
+  if (diaSemana !== 1 || hora < 9) return; // só segunda-feira, a partir das 9h
+  if (config.tercaDaSorteUltimoEnvio === data) return; // já perguntou essa semana
+  if (!whatsappConfigurado()) return; // WhatsApp desligado, nem tenta
+
+  const cliente = dadosCompartilhados.clients.find(
+    (c) => normalizarNomeSimples(c.name) === normalizarNomeSimples(NOME_CLIENTE_TERCA_DA_SORTE),
+  );
+  if (!cliente || !cliente.whatsappGroup) {
+    registrar('terca-da-sorte',
+      `Cliente "${NOME_CLIENTE_TERCA_DA_SORTE}" não encontrado (ou sem grupo de WhatsApp cadastrado) — pergunta semanal não enviada.`, false);
+    return;
+  }
+
+  const mensagem =
+    'Bom dia! É segunda-feira, hora de fechar a arte da Terça da Sorte de amanhã.\n\n' +
+    'Quais são os valores da promoção dessa semana?';
+  try {
+    await enviarWhatsapp(cliente.whatsappGroup, mensagem);
+    config.tercaDaSorteUltimoEnvio = data;
+    gravarConfig(config);
+    registrar('terca-da-sorte', `Pergunta semanal da Terça da Sorte enviada para ${cliente.name}.`, true);
+  } catch (e) {
+    registrar('terca-da-sorte', `Falha ao enviar a pergunta semanal: ${e.message}`, false);
+  }
+}
+
+// Checa a cada 5 minutos (e uma vez já na subida — cobre o Conector ligado
+// depois das 9h de segunda) se está na hora de perguntar.
+setInterval(() => { verificarTercaDaSorte().catch(() => {}); }, 5 * 60 * 1000);
+verificarTercaDaSorte().catch(() => {});
 
 /**
  * Lista os grupos de WhatsApp que a instância conectada enxerga — é o que

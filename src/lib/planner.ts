@@ -74,34 +74,34 @@ function isVideoType(type: string): boolean {
  */
 const ANGLES = {
   foto: [
-    { titulo: 'Dica prática para o público', material: 'foto real do produto, ambiente ou equipe relacionada à dica', arte: '[NÚMERO] DICA(S) PRA [RESULTADO QUE O PÚBLICO QUER]' },
-    { titulo: 'Prova social com resultado de cliente', material: 'foto do resultado entregue, ou print do depoimento do cliente', arte: 'MAIS UM CLIENTE SATISFEITO' },
-    { titulo: 'Mito e verdade do segmento', material: 'foto de produto ou ambiente que ilustre o tema (pode ser de estúdio)', arte: 'MITO OU VERDADE?' },
-    { titulo: 'Apresentação de produto ou serviço em destaque', material: 'foto real do produto/serviço em destaque, boa iluminação', arte: '[NOME DO PRODUTO/SERVIÇO]' },
-    { titulo: 'Depoimento ou avaliação de cliente real', material: 'print do depoimento ou foto do cliente satisfeito (pedir autorização)', arte: '"[FRASE CURTA DO DEPOIMENTO]"' },
-    { titulo: 'Oferta ou condição comercial do mês', material: 'foto do produto com destaque para o preço/condição', arte: '[CONDIÇÃO/OFERTA] — POR TEMPO LIMITADO' },
-    { titulo: 'Erro comum que o público comete', material: 'foto de produto/ambiente que ilustre o erro ou a solução', arte: 'O ERRO QUE QUASE TODO MUNDO COMETE' },
-    { titulo: 'Comparativo: com vs. sem o produto/serviço', material: 'foto de antes/depois ou comparação lado a lado', arte: 'FAZ TODA A DIFERENÇA' },
-    { titulo: 'Curiosidade do segmento', material: 'foto de apoio ao tema (pode ser de estúdio, sem precisar do cliente)', arte: 'CURIOSIDADE' },
-    { titulo: 'Pergunta pro público responder nos comentários', material: 'foto que ilustre a pergunta, engajamento direto', arte: '[PERGUNTA DIRETA PRO PÚBLICO]' },
-    { titulo: 'Numeros e resultados que o negócio já entregou', material: 'foto do ambiente/equipe, dado em destaque na arte', arte: '[NÚMERO] [RESULTADO ENTREGUE]' },
-    { titulo: 'Passo a passo de como funciona o serviço', material: 'foto do processo ou etapa específica do serviço', arte: 'COMO FUNCIONA' },
-    { titulo: 'Novidade ou lançamento', material: 'foto real do que é novo — produto, serviço ou espaço', arte: 'CHEGOU NOVIDADE' },
-    { titulo: 'Convite pra visitar ou agendar', material: 'foto convidativa do ambiente/fachada/equipe pronta pra atender', arte: 'TE ESPERAMOS' },
+    { titulo: 'Dica prática para o público', material: 'foto real do produto, ambiente ou equipe relacionada à dica', arte: 'A DICA QUE FAZ TODA DIFERENÇA', subheadline: 'Simples de aplicar, no seu dia a dia.' },
+    { titulo: 'Prova social com resultado de cliente', material: 'foto do resultado entregue, ou print do depoimento do cliente', arte: 'MAIS UM RESULTADO CONFIRMADO', subheadline: 'Prova de que o trabalho bem feito aparece.' },
+    { titulo: 'Mito e verdade do segmento', material: 'foto de produto ou ambiente que ilustre o tema (pode ser de estúdio)', arte: 'MITO OU VERDADE?', subheadline: 'Vamos separar o que é real do que não é.' },
+    { titulo: 'Apresentação de produto ou serviço em destaque', material: 'foto real do produto/serviço em destaque, boa iluminação', arte: 'CONHEÇA DE PERTO', subheadline: 'O que a gente oferece, na prática.' },
+    { titulo: 'Depoimento ou avaliação de cliente real', material: 'print do depoimento ou foto do cliente satisfeito (pedir autorização)', arte: 'QUEM JÁ PASSOU POR AQUI CONTA', subheadline: 'A opinião de quem viveu a experiência.' },
+    { titulo: 'Oferta ou condição comercial do mês', material: 'foto do produto com destaque para o preço/condição', arte: 'CONDIÇÃO ESPECIAL DESSE MÊS', subheadline: 'Por tempo limitado, só aqui.' },
+    { titulo: 'Erro comum que o público comete', material: 'foto de produto/ambiente que ilustre o erro ou a solução', arte: 'O ERRO QUE QUASE TODO MUNDO COMETE', subheadline: 'E como evitar isso a partir de hoje.' },
+    { titulo: 'Comparativo: com vs. sem o produto/serviço', material: 'foto de antes/depois ou comparação lado a lado', arte: 'FAZ TODA A DIFERENÇA', subheadline: 'Veja lado a lado o antes e o depois.' },
+    { titulo: 'Curiosidade do segmento', material: 'foto de apoio ao tema (pode ser de estúdio, sem precisar do cliente)', arte: 'VOCÊ SABIA?', subheadline: 'Uma curiosidade sobre o nosso segmento.' },
+    { titulo: 'Pergunta pro público responder nos comentários', material: 'foto que ilustre a pergunta, engajamento direto', arte: 'E VOCÊ, JÁ PASSOU POR ISSO?', subheadline: 'Conta pra gente aqui nos comentários.' },
+    { titulo: 'Numeros e resultados que o negócio já entregou', material: 'foto do ambiente/equipe, dado em destaque na arte', arte: 'NÚMEROS QUE FALAM POR SI', subheadline: 'O resultado que a gente já entregou.' },
+    { titulo: 'Passo a passo de como funciona o serviço', material: 'foto do processo ou etapa específica do serviço', arte: 'COMO FUNCIONA, NA PRÁTICA', subheadline: 'Do primeiro passo até o resultado final.' },
+    { titulo: 'Novidade ou lançamento', material: 'foto real do que é novo — produto, serviço ou espaço', arte: 'CHEGOU NOVIDADE', subheadline: 'Você vai querer conhecer isso de perto.' },
+    { titulo: 'Convite pra visitar ou agendar', material: 'foto convidativa do ambiente/fachada/equipe pronta pra atender', arte: 'TE ESPERAMOS POR AQUI', subheadline: 'Vem conhecer de perto o que preparamos.' },
   ],
   video: [
-    { titulo: 'Bastidores gravados no local', gancho: 'Abre mostrando algo inesperado do dia a dia do negócio', conteudo: 'Mostra o processo/trabalho acontecendo de verdade, sem roteiro engessado', cta: 'Convite pra visitar, marcar horário ou mandar mensagem', arte: 'BASTIDORES' },
-    { titulo: 'Antes e depois', gancho: 'Mostra o "antes", o problema real', conteudo: 'Corte pro "depois", o resultado alcançado', cta: 'Chamada pra quem tem o mesmo problema entrar em contato', arte: 'ANTES x DEPOIS' },
-    { titulo: 'Tutorial rápido', gancho: 'Promessa direta: "em X segundos você aprende..."', conteudo: 'Passo a passo simples, linguagem acessível', cta: 'Pedir pra salvar o vídeo e seguir o perfil', arte: 'APRENDA EM SEGUNDOS' },
-    { titulo: 'Resposta a uma dúvida frequente', gancho: 'Repete a pergunta que os clientes mais fazem', conteudo: 'Resposta direta, sem enrolação, com exemplo real', cta: 'Convite pra mandar outras dúvidas nos comentários', arte: 'RESPONDENDO SUA DÚVIDA' },
-    { titulo: 'Tendência adaptada ao segmento', gancho: 'Usa o formato/áudio em alta do momento', conteudo: 'Adapta a tendência pro contexto do negócio, sem forçar', cta: 'CTA leve, foco em engajamento (comentar, compartilhar)', arte: '' },
-    { titulo: 'Tour ou demonstração', gancho: 'Abre já mostrando o espaço ou o produto em uso', conteudo: 'Percorre os pontos fortes do local/produto', cta: 'Convite direto pra visitar ou comprar', arte: 'VEM CONHECER' },
-    { titulo: 'Dia a dia da equipe', gancho: 'Mostra a equipe trabalhando, sem cenário montado', conteudo: 'Passa confiança mostrando quem está por trás do negócio', cta: 'Reforça o convite pra conhecer quem vai atender', arte: 'QUEM FAZ ACONTECER' },
-    { titulo: 'Reação a uma pergunta ou comentário real', gancho: 'Lê um comentário/pergunta real de cliente na tela', conteudo: 'Responde de forma direta, olhando pra câmera', cta: 'Convite pra deixar a próxima pergunta nos comentários', arte: '' },
-    { titulo: 'Um dia de trabalho resumido', gancho: 'Corte rápido mostrando o início do expediente', conteudo: 'Sequência de momentos do dia, ritmo ágil', cta: 'Convite pra acompanhar mais nos stories', arte: 'UM DIA NA [NOME DO NEGÓCIO]' },
-    { titulo: 'Explicando um erro comum do segmento', gancho: 'Alerta direto: "isso pode estar te prejudicando"', conteudo: 'Explica o erro e como o negócio resolve isso', cta: 'Convite pra chamar no direct/WhatsApp', arte: 'CUIDADO COM ISSO' },
-    { titulo: 'Resultado real de cliente contado em vídeo', gancho: 'Mostra o resultado final logo de cara', conteudo: 'Conta rapidamente como chegou lá', cta: 'Convite pra quem quer o mesmo resultado', arte: 'RESULTADO REAL' },
-    { titulo: 'Bastidores de uma entrega/atendimento', gancho: 'Abre no meio da ação, sem introdução longa', conteudo: 'Acompanha a entrega/atendimento até o fim', cta: 'Convite pra agendar o próprio atendimento', arte: '' },
+    { titulo: 'Bastidores gravados no local', gancho: 'Abre mostrando algo inesperado do dia a dia do negócio', conteudo: 'Mostra o processo/trabalho acontecendo de verdade, sem roteiro engessado', cta: 'Convite pra visitar, marcar horário ou mandar mensagem', arte: 'BASTIDORES', subheadline: 'O que acontece por trás do resultado.' },
+    { titulo: 'Antes e depois', gancho: 'Mostra o "antes", o problema real', conteudo: 'Corte pro "depois", o resultado alcançado', cta: 'Chamada pra quem tem o mesmo problema entrar em contato', arte: 'ANTES x DEPOIS', subheadline: 'A diferença que o resultado faz.' },
+    { titulo: 'Tutorial rápido', gancho: 'Promessa direta: "em X segundos você aprende..."', conteudo: 'Passo a passo simples, linguagem acessível', cta: 'Pedir pra salvar o vídeo e seguir o perfil', arte: 'APRENDA RÁPIDO', subheadline: 'Direto ao ponto, sem enrolação.' },
+    { titulo: 'Resposta a uma dúvida frequente', gancho: 'Repete a pergunta que os clientes mais fazem', conteudo: 'Resposta direta, sem enrolação, com exemplo real', cta: 'Convite pra mandar outras dúvidas nos comentários', arte: 'RESPONDENDO SUA DÚVIDA', subheadline: 'A pergunta que mais chega por aqui.' },
+    { titulo: 'Tendência adaptada ao segmento', gancho: 'Usa o formato/áudio em alta do momento', conteudo: 'Adapta a tendência pro contexto do negócio, sem forçar', cta: 'CTA leve, foco em engajamento (comentar, compartilhar)', arte: 'ENTROU NA TENDÊNCIA', subheadline: 'Adaptado do nosso jeito.' },
+    { titulo: 'Tour ou demonstração', gancho: 'Abre já mostrando o espaço ou o produto em uso', conteudo: 'Percorre os pontos fortes do local/produto', cta: 'Convite direto pra visitar ou comprar', arte: 'VEM CONHECER', subheadline: 'Um tour por dentro, de perto.' },
+    { titulo: 'Dia a dia da equipe', gancho: 'Mostra a equipe trabalhando, sem cenário montado', conteudo: 'Passa confiança mostrando quem está por trás do negócio', cta: 'Reforça o convite pra conhecer quem vai atender', arte: 'QUEM FAZ ACONTECER', subheadline: 'A equipe por trás de cada entrega.' },
+    { titulo: 'Reação a uma pergunta ou comentário real', gancho: 'Lê um comentário/pergunta real de cliente na tela', conteudo: 'Responde de forma direta, olhando pra câmera', cta: 'Convite pra deixar a próxima pergunta nos comentários', arte: 'RESPONDENDO DE VERDADE', subheadline: 'Sua pergunta, respondida na hora.' },
+    { titulo: 'Um dia de trabalho resumido', gancho: 'Corte rápido mostrando o início do expediente', conteudo: 'Sequência de momentos do dia, ritmo ágil', cta: 'Convite pra acompanhar mais nos stories', arte: 'UM DIA POR AQUI', subheadline: 'Do começo ao fim do expediente.' },
+    { titulo: 'Explicando um erro comum do segmento', gancho: 'Alerta direto: "isso pode estar te prejudicando"', conteudo: 'Explica o erro e como o negócio resolve isso', cta: 'Convite pra chamar no direct/WhatsApp', arte: 'CUIDADO COM ISSO', subheadline: 'Um erro comum que pode te prejudicar.' },
+    { titulo: 'Resultado real de cliente contado em vídeo', gancho: 'Mostra o resultado final logo de cara', conteudo: 'Conta rapidamente como chegou lá', cta: 'Convite pra quem quer o mesmo resultado', arte: 'RESULTADO REAL', subheadline: 'Contado por quem viveu.' },
+    { titulo: 'Bastidores de uma entrega/atendimento', gancho: 'Abre no meio da ação, sem introdução longa', conteudo: 'Acompanha a entrega/atendimento até o fim', cta: 'Convite pra agendar o próprio atendimento', arte: 'BASTIDORES DA ENTREGA', subheadline: 'Do pedido até a entrega final.' },
   ],
 } as const;
 
@@ -134,13 +134,16 @@ function localBrief(type: string, angle: AnguloFoto | AnguloVideo, holiday?: str
 }
 
 /**
- * Texto pra escrever na arte/capa — o que o designer bota na peça, diferente
- * da legenda (que vai no texto do post). Data comemorativa sempre tem
- * prioridade sobre o ângulo, porque é o que o público espera ver na peça.
+ * Texto pra escrever na arte/capa — headline + subheadline curta, o que o
+ * designer bota na peça, diferente da legenda (que vai no texto do post).
+ * Data comemorativa sempre tem prioridade sobre o ângulo, porque é o que o
+ * público espera ver na peça. Sem IA configurada esse texto sai genérico
+ * de propósito (não tem como inventar dado real do cliente) — a IA, quando
+ * configurada, sobrescreve com algo específico pro briefing (ver ai.ts).
  */
 function localArte(angle: AnguloFoto | AnguloVideo, holiday?: string): string {
-  if (holiday) return holiday.toUpperCase();
-  return angle.arte;
+  if (holiday) return `${holiday.toUpperCase()}\nUm dia especial pra celebrar com você.`;
+  return `${angle.arte}\n${angle.subheadline}`;
 }
 
 const CTAS_LOCAIS = [
@@ -171,8 +174,12 @@ function localCaption(type: string, angle: AnguloFoto | AnguloVideo, client: Cli
   return `${a.titulo} — direto aqui da ${client.name}.\n\n${client.briefing ? client.briefing.split('.')[0] + '.' : ''} ${cta}`.trim();
 }
 
-/** Monta os slots do mês a partir da cadência semanal + datas comemorativas. */
-export function buildClientSlots(client: Client, year: number, month: number): PlanItem[] {
+/**
+ * Monta os slots do mês a partir da cadência semanal + datas comemorativas.
+ * `fromDay` pula os dias antes dele (padrão 1 = mês inteiro) — pra gerar só
+ * o que falta do mês corrente, por exemplo hoje até o fim do mês.
+ */
+export function buildClientSlots(client: Client, year: number, month: number, fromDay = 1): PlanItem[] {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   // Datas do calendário nacional mais as datas próprias do cliente
   // (aniversário de cada cidade onde ele atua, aniversário da loja, data do
@@ -200,7 +207,7 @@ export function buildClientSlots(client: Client, year: number, month: number): P
     };
   }
 
-  for (let d = 1; d <= daysInMonth; d++) {
+  for (let d = fromDay; d <= daysInMonth; d++) {
     const dow = new Date(year, month, d).getDay();
     const types = client.weeklyPlan?.[dow] ?? [];
     const hol = monthHolidays.find((h) => Number(h.md.slice(3)) === d);
@@ -212,7 +219,7 @@ export function buildClientSlots(client: Client, year: number, month: number): P
   // Post extra nas datas universais e nas datas próprias do cliente, mesmo
   // que não haja cadência naquele dia.
   const proprioNoMes = new Set(proprias.map((p) => p.md));
-  for (const h of monthHolidays.filter((x) => x.universal || proprioNoMes.has(x.md))) {
+  for (const h of monthHolidays.filter((x) => (x.universal || proprioNoMes.has(x.md)) && Number(x.md.slice(3)) >= fromDay)) {
     const date = iso(year, month, Number(h.md.slice(3)));
     if (!items.some((i) => i.date === date && i.holiday === h.name)) {
       items.push(montarItem(date, 'Post', h.name));

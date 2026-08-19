@@ -49,11 +49,15 @@ export function PlanModal({ client, onClose }: { client: Client; onClose: () => 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    const slots = buildClientSlots(client, ym.y, ym.m);
+    // Vendo o mês corrente: começa de hoje, não do dia 1 (não faz sentido
+    // gerar posts pra datas que já passaram).
+    const hoje = new Date();
+    const fromDay = ym.y === hoje.getFullYear() && ym.m === hoje.getMonth() ? hoje.getDate() : 1;
+    const slots = buildClientSlots(client, ym.y, ym.m, fromDay);
     const recentTitles = recentTitlesFor(client.id);
     generatePlanIdeas(client, slots.map((s) => ({ ...s, recentTitles }))).then((ideas) => {
       if (!alive) return;
-      setItems(ideas ? slots.map((s, i) => ({ ...s, title: ideas[i]?.title ?? s.title, caption: ideas[i]?.caption ?? s.caption })) : slots);
+      setItems(ideas ? slots.map((s, i) => ({ ...s, title: ideas[i]?.title ?? s.title, caption: ideas[i]?.caption ?? s.caption, arte: ideas[i]?.arte ?? s.arte })) : slots);
       setLoading(false);
     });
     return () => { alive = false; };
