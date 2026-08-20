@@ -318,7 +318,7 @@ export interface AiChatMessage {
  * loop; ferramentas sensíveis pausam pra confirmação antes de rodar).
  *
  * Precisa de uma chave de IA configurada com suporte a function calling
- * (Groq com Llama 3.3/3.1 funciona bem). Sem IA configurada, lança erro —
+ * (OpenAI/gpt-4o, o padrão da equipe, funciona direto). Sem IA configurada, lança erro —
  * quem chama trata e avisa o usuário, já que aqui não existe fallback local
  * sensato pra "executar ações".
  */
