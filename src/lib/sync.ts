@@ -99,6 +99,32 @@ async function reconciliarChaveIA(): Promise<void> {
   }
 }
 
+/**
+ * Sem endereço do Conector configurado, tenta achar um rodando NESTA
+ * máquina (http://localhost:8787) e se configura sozinho — é o único
+ * endereço não-HTTPS que o navegador deixa um site HTTPS chamar, então na
+ * máquina da agência (onde o Conector roda) fica verde sem ninguém colar
+ * nada. Os outros dispositivos usam o endereço público do túnel, colado
+ * uma vez em Integrações.
+ */
+async function detectarConectorLocal(): Promise<void> {
+  const s = useSettings.getState();
+  if (s.connectorUrl) return;
+  try {
+    const controle = new AbortController();
+    const limite = setTimeout(() => controle.abort(), 1_500);
+    const res = await fetch('http://localhost:8787/dados', { signal: controle.signal });
+    clearTimeout(limite);
+    const data = await res.json();
+    // Só configura se responder como o Conector de verdade responde.
+    if (data?.ok === true && data.dados) {
+      s.update({ connectorUrl: 'http://localhost:8787' });
+    }
+  } catch {
+    // Nada rodando aqui: normal em qualquer máquina que não é a do Conector.
+  }
+}
+
 const INTERVALO_MS = 3_000;
 
 /**
@@ -123,6 +149,15 @@ export function useLiveSync(): void {
     const id = setTimeout(() => { void reconciliarChaveIA(); }, 1_200);
     return () => clearTimeout(id);
   }, [connectorUrl, aiKey]);
+
+  // Sem endereço configurado: procura um Conector nesta máquina, agora e a
+  // cada 15s — se alguém abrir o Conector depois do site, conecta sozinho.
+  useEffect(() => {
+    if (connectorUrl) return;
+    void detectarConectorLocal();
+    const id = setInterval(() => { void detectarConectorLocal(); }, 15_000);
+    return () => clearInterval(id);
+  }, [connectorUrl]);
 
   useEffect(() => {
     if (!connectorUrl) return;

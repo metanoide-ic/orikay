@@ -1397,7 +1397,12 @@ servidor.listen(PORT, () => {
     console.log(`  Endereço para colar na plataforma:  ${TUNEL_FIXO || `http://localhost:${PORT}`}/webhook${sufixo}`);
   } else {
     console.log(`  Abra no navegador:  http://localhost:${PORT}`);
-    console.log(`  Endereço para colar na plataforma:  http://localhost:${PORT}/webhook`);
+    console.log('');
+    console.log('  NESTE computador, o site acha o Conector sozinho (bolinha verde');
+    console.log('  automática). Pros OUTROS dispositivos da equipe (celulares, outros');
+    console.log('  computadores), cole em Integrações o endereço público do túnel —');
+    console.log('  ele aparece aqui embaixo assim que o túnel abrir, e também na tela');
+    console.log(`  do Conector (http://localhost:${PORT}).`);
   }
   console.log('');
   console.log('  Deixe esta janela aberta enquanto usar a plataforma.');
