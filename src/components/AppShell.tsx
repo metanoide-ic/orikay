@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/authStore';
 import { useSettings } from '@/lib/settingsStore';
 import { usePendingPosts, fireDueNotifications } from '@/lib/notifications';
 import { useApprovalInbox } from '@/lib/inbox';
-import { useLiveSync } from '@/lib/sync';
+import { useLiveSync, useSyncStatus } from '@/lib/sync';
 import { autoSendDueCharges } from '@/lib/billing';
 import { generateMonthlyExpenses } from '@/lib/expenses';
 import { cn } from '@/lib/utils';
@@ -108,6 +108,56 @@ function NotificationBell() {
   );
 }
 
+/**
+ * Estado da sincronização com a equipe, sempre visível — antes ficava
+ * escondido dentro de Integrações, e quando a sincronização parava (Conector
+ * fora do ar, endereço não configurado neste navegador) ninguém percebia:
+ * a pessoa criava um cartão, ele ficava só nela, e parecia bug misterioso.
+ * Clicar leva pra Integrações, onde se configura/conserta.
+ */
+function SyncPill({ compact }: { compact?: boolean }) {
+  const connectorUrl = useSettings((s) => s.connectorUrl);
+  const { ultimaVez, ultimoErro } = useSyncStatus();
+  const navigate = useNavigate();
+
+  let cor: string;
+  let rotulo: string;
+  let detalhe: string;
+  if (!connectorUrl) {
+    cor = 'bg-amber-400';
+    rotulo = 'Só neste navegador';
+    detalhe = 'Sem o endereço do Conector, o que você cria NÃO aparece pra equipe. Clique e cole o endereço em Integrações.';
+  } else if (ultimoErro) {
+    cor = 'bg-red-400';
+    rotulo = 'Sincronização parada';
+    detalhe = 'Não estou conseguindo falar com o Conector — confira se ele está aberto no computador da agência.';
+  } else if (ultimaVez) {
+    cor = 'bg-emerald-400';
+    rotulo = 'Equipe sincronizada';
+    detalhe = 'Tudo que você cria aparece pra equipe em segundos.';
+  } else {
+    cor = 'bg-white/30';
+    rotulo = 'Conectando…';
+    detalhe = 'Tentando falar com o Conector.';
+  }
+
+  if (compact) {
+    return (
+      <button onClick={() => navigate('/app/integracoes')} title={`${rotulo} — ${detalhe}`}
+        className="grid h-10 w-10 place-items-center rounded-xl text-white/70 hover:bg-white/5" aria-label={rotulo}>
+        <span className={cn('h-2.5 w-2.5 rounded-full', cor)} />
+      </button>
+    );
+  }
+  return (
+    <button onClick={() => navigate('/app/integracoes')} title={detalhe}
+      className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-ink-850 px-3 py-2 text-left text-xs text-white/60 transition hover:bg-white/5 hover:text-white">
+      <span className={cn('h-2 w-2 shrink-0 rounded-full', cor)} />
+      <span className="truncate">{rotulo}</span>
+    </button>
+  );
+}
+
 function UserCard() {
   const user = useAuth((s) => s.current());
   const logout = useAuth((s) => s.logout);
@@ -159,12 +209,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NotificationBell />
         </div>
         <div className="mt-6 flex-1 overflow-y-auto"><NavItems /></div>
+        <SyncPill />
         <UserCard />
       </aside>
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-ink-900/70 px-4 py-3 backdrop-blur-xl lg:hidden">
         <Logo size="sm" showTagline={false} />
         <div className="flex items-center gap-1">
+          <SyncPill compact />
           <NotificationBell />
           <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl text-white/70 hover:bg-white/5" aria-label="Abrir menu"><Menu size={20} /></button>
         </div>
@@ -179,6 +231,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button onClick={() => setMobileOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl text-white/70 hover:bg-white/5"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto"><NavItems onNavigate={() => setMobileOpen(false)} /></div>
+            <SyncPill />
             <UserCard />
           </motion.div>
         </div>
