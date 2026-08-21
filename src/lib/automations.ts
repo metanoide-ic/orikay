@@ -62,8 +62,12 @@ export async function sendForApproval(postId: string): Promise<void> {
     mediaUrl: post.mediaUrl || null,
   };
 
-  if (s.sendOnApprovalStage && s.whatsappWebhook) {
-    const ok = await fireWebhook(s.whatsappWebhook, payload);
+  // O Conector entende o mesmo evento que o webhook antigo (Make/n8n) —
+  // com o Conector conectado (bolinha verde), não precisa configurar mais
+  // nada pra mandar de verdade.
+  const canalWhatsapp = s.whatsappWebhook || s.connectorUrl;
+  if (s.sendOnApprovalStage && canalWhatsapp) {
+    const ok = await fireWebhook(canalWhatsapp, payload);
     log('whatsapp', `Enviado ao grupo: "${post.title}"`, ok ? 'ok' : 'erro',
       ok ? `Mensagem "Segue aqui para aprovação" + copy disparada via webhook.` : 'Falha ao disparar o webhook.', postId);
   } else {
@@ -94,8 +98,10 @@ export async function publishPost(postId: string): Promise<void> {
       legenda: caption,
       mediaUrl: post.mediaUrl || null,
     };
-    if (s.publishWebhook) {
-      const ok = await fireWebhook(s.publishWebhook, payload);
+    // Mesmo caso do WhatsApp: o Conector também publica (tipo 'publicar').
+    const canalPublicacao = s.publishWebhook || s.connectorUrl;
+    if (canalPublicacao) {
+      const ok = await fireWebhook(canalPublicacao, payload);
       log('instagram', `Publicado no ${destino}: "${post.title}"`, ok ? 'ok' : 'erro',
         ok ? `Enviado ao webhook de publicação (${destino}).` : 'Falha no webhook de publicação.', postId);
     } else {

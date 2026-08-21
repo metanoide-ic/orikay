@@ -20,7 +20,7 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
   const addRevision = useData((s) => s.addRevision);
   const updateRevision = useData((s) => s.updateRevision);
   const removeRevision = useData((s) => s.removeRevision);
-  const whatsappReady = useSettings((s) => Boolean(s.whatsappWebhook));
+  const whatsappReady = useSettings((s) => Boolean(s.whatsappWebhook || s.connectorUrl));
 
   const [genLoading, setGenLoading] = useState(false);
   const [rejecting, setRejecting] = useState(false);

@@ -203,8 +203,10 @@ export async function sendCharge(chargeId: string): Promise<ResultadoCobranca> {
         `Olá! Pode emitir a nota fiscal de ${monthLabel(ch.month)} para ${client.name}, ` +
         `no valor de ${money(ch.amount)}? Referente aos serviços de marketing da Origem. Obrigado!`,
     };
-    if (settings.whatsappWebhook && settings.contadorWhatsapp) {
-      const ok = await fireWebhook(settings.whatsappWebhook, nfPayload);
+    // O Conector também entende o pedido de nota fiscal (tipo 'nota_fiscal').
+    const canalNf = settings.whatsappWebhook || settings.connectorUrl;
+    if (canalNf && settings.contadorWhatsapp) {
+      const ok = await fireWebhook(canalNf, nfPayload);
       store.addEvent({
         channel: 'whatsapp',
         title: `Nota fiscal pedida ao contador (${client.name})`,

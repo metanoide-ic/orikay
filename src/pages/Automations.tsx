@@ -85,8 +85,10 @@ const FLOWS = [
 export default function Automations() {
   const { events, clearEvents } = useData();
   const s = useSettings();
-  const wppOk = Boolean(s.whatsappWebhook);
-  const pubOk = Boolean(s.publishWebhook);
+  // O Conector cobre os dois canais quando os webhooks avulsos (Make/n8n)
+  // não estão configurados — conectado, tudo dispara de verdade por ele.
+  const wppOk = Boolean(s.whatsappWebhook || s.connectorUrl);
+  const pubOk = Boolean(s.publishWebhook || s.connectorUrl);
   const gatewayOk = Boolean(s.connectorUrl); // confirmação automática de pagamento depende do conector com Asaas
   const [flow, setFlow] = useState<(typeof FLOWS)[number]['id']>('posts');
   const [filtro, setFiltro] = useState<'todos' | EventChannel>('todos');
