@@ -1197,7 +1197,13 @@ const servidor = createServer(async (req, res) => {
   // aos serviços externos) e continuam liberados aqui — sem eles a Z-API e
   // o Asaas nunca conseguiriam entregar nada.
   const rotaComTokenProprio = url.pathname === '/entrada' || url.pathname === '/entrada-pagamento';
-  if (EXIGIR_TOKEN && !rotaComTokenProprio && url.searchParams.get('token') !== config.entradaToken) {
+  // Pedido vindo de FORA desta máquina (túnel público ou rede) exige o
+  // token sempre, mesmo sem EXIGIR_TOKEN — sem isso, qualquer um que
+  // descobrisse o endereço do túnel leria (e mudaria) os dados da equipe
+  // inteira: clientes, financeiro, tudo. Na própria máquina (localhost)
+  // continua livre, como sempre foi.
+  const hostLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(req.headers.host || '');
+  if ((EXIGIR_TOKEN || !hostLocal) && !rotaComTokenProprio && url.searchParams.get('token') !== config.entradaToken) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: false, erro: 'token inválido ou ausente — confira o endereço colado na Orikay' }));
   }
@@ -1608,7 +1614,7 @@ const PAGINA = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
     const rotulo = { aberto: t.url, abrindo: 'abrindo o túnel...', parado: 'túnel desligado', erro: 'não foi possível abrir o túnel' };
     document.getElementById('tunelUrl').textContent = rotulo[t.estado] || 'túnel desligado';
     document.getElementById('tunelInfo').textContent = t.estado === 'aberto'
-      ? 'Endereço no ar. Os webhooks já foram registrados nos serviços configurados.'
+      ? 'Endereço no ar (webhooks registrados). Pros OUTROS dispositivos da equipe, cole em Integrações: ' + t.url + '/webhook?token=' + r.config.entradaToken
       : (t.erro || 'O endereço muda a cada reinício, e o conector registra o novo sozinho.');
     const h = document.getElementById('hist');
     if (r.historico.length) {

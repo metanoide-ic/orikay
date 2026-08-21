@@ -117,8 +117,11 @@ async function detectarConectorLocal(): Promise<void> {
     clearTimeout(limite);
     const data = await res.json();
     // Só configura se responder como o Conector de verdade responde.
+    // Guarda no formato ".../webhook" — é o que o resto da plataforma
+    // espera: cobrança e disparos POSTam direto nesse endereço, e as
+    // outras rotas trocam o /webhook pelo caminho certo (connectorPath).
     if (data?.ok === true && data.dados) {
-      s.update({ connectorUrl: 'http://localhost:8787' });
+      s.update({ connectorUrl: 'http://localhost:8787/webhook' });
     }
   } catch {
     // Nada rodando aqui: normal em qualquer máquina que não é a do Conector.

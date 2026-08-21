@@ -173,7 +173,10 @@ const TOOLS: ToolDef[] = [
         else return { erro: 'Esse cliente não tem grupo de WhatsApp cadastrado.' };
       }
       try {
-        const url = connectorPath(connectorUrl, '/mensagens') + (params.toString() ? `&${params}` : '');
+        // O separador depende do endereço: com "?token=" já na URL (túnel
+        // trancado) é "&"; sem token (localhost) é "?".
+        const base = connectorPath(connectorUrl, '/mensagens');
+        const url = params.toString() ? `${base}${base.includes('?') ? '&' : '?'}${params}` : base;
         const res = await fetch(url);
         const data = await res.json();
         if (!data?.ok) return { erro: 'Conector não respondeu direito.' };
