@@ -21,7 +21,7 @@ import { useData } from '@/lib/dataStore';
 import { useSettings } from '@/lib/settingsStore';
 import { useClientMap, monthKey } from '@/lib/hooks';
 import {
-  generateMonthlyCharges, sendCharge, sendAllPending, markChargePaid,
+  generateMonthlyCharges, sendCharge, cobrarTodoMundo, markChargePaid,
   isOverdue, currentMonthKey, monthLabel, METHOD_LABEL,
 } from '@/lib/billing';
 import { generateMonthlyExpenses } from '@/lib/expenses';
@@ -183,13 +183,26 @@ export default function Finance() {
               setTimeout(() => setBillingMsg(''), 4000);
             }}>Gerar cobranças</Button>
             <Button size="sm" onClick={async () => {
-              const n = await sendAllPending();
-              setBillingMsg(n ? `${n} cobrança(s) enviada(s) no WhatsApp.` : 'Nenhuma cobrança vencida pendente de envio.');
-              setTimeout(() => setBillingMsg(''), 4000);
-            }}>Cobrar vencidas</Button>
+              setBillingMsg('Cobrando todo mundo…');
+              const r = await cobrarTodoMundo();
+              const linhas: string[] = [];
+              if (r.geradas) linhas.push(`${r.geradas} cobrança(s) nova(s) gerada(s).`);
+              if (r.semCanal) {
+                linhas.push('NADA foi enviado: este navegador não está conectado ao Conector (veja a bolinha no menu). As cobranças continuam pendentes — conecte e clique de novo.');
+              } else {
+                if (r.enviadas.length) linhas.push(`Enviadas no WhatsApp (${r.enviadas.length}): ${r.enviadas.join(', ')}.`);
+                if (r.semWhatsapp.length) linhas.push(`Sem WhatsApp de cobrança (${r.semWhatsapp.length}): ${r.semWhatsapp.join(', ')} — preencha em Clientes e clique de novo.`);
+                if (r.falhas.length) linhas.push(`Falharam (${r.falhas.length}): ${r.falhas.join(', ')} — confira se o Conector está aberto e tente de novo.`);
+                if (!r.enviadas.length && !r.semWhatsapp.length && !r.falhas.length) {
+                  linhas.push(r.jaPagas ? 'Todo mundo deste mês já está pago — nada a cobrar.' : 'Nenhuma cobrança pra enviar. Defina o fee mensal dos clientes em Clientes.');
+                }
+              }
+              setBillingMsg(linhas.join('\n'));
+              setTimeout(() => setBillingMsg(''), 20_000);
+            }}>Cobrar todo mundo</Button>
           </div>
         </div>
-        {billingMsg && <p className="border-b border-line bg-white/[0.02] px-5 py-2.5 text-sm text-white/70">{billingMsg}</p>}
+        {billingMsg && <p className="whitespace-pre-line border-b border-line bg-white/[0.02] px-5 py-2.5 text-sm text-white/70">{billingMsg}</p>}
         {selecionadas.size > 0 && (
           <div className="flex items-center justify-between gap-3 border-b border-line bg-brand-500/10 px-5 py-2.5">
             <span className="text-sm text-brand-100">{selecionadas.size} selecionada(s) — já mandaram o comprovante?</span>
@@ -254,7 +267,16 @@ export default function Finance() {
                       <div className="flex items-center justify-end gap-1.5">
                         {ch.status !== 'paga' && (
                           <>
-                            <Button size="sm" variant="soft" onClick={() => { void sendCharge(ch.id); }}>
+                            <Button size="sm" variant="soft" onClick={async () => {
+                              const r = await sendCharge(ch.id);
+                              setBillingMsg(
+                                r.enviada ? `Cobrança de ${client?.name ?? 'cliente'} enviada no WhatsApp.`
+                                : r.motivo === 'sem-whatsapp' ? `${client?.name ?? 'Esse cliente'} não tem WhatsApp de cobrança — preencha em Clientes.`
+                                : r.motivo === 'sem-canal' ? 'Nada enviado: este navegador não está conectado ao Conector (veja a bolinha no menu).'
+                                : `Falhou o envio pra ${client?.name ?? 'cliente'} — confira se o Conector está aberto e tente de novo.`,
+                              );
+                              setTimeout(() => setBillingMsg(''), 10_000);
+                            }}>
                               {ch.status === 'enviada' ? 'Reenviar' : 'Cobrar'}
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => markChargePaid(ch.id)}>Marcar paga</Button>

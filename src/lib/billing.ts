@@ -87,17 +87,25 @@ function chargeMessage(ch: Charge, pixKey: string, reenvio: boolean): string {
   return base + `\nA nota fiscal está sendo emitida e chega em seguida.\n\nQualquer dúvida é só responder por aqui. Obrigado!`;
 }
 
+/** O que aconteceu de verdade com uma cobrança — pra tela poder contar a verdade, não a tentativa. */
+export interface ResultadoCobranca {
+  enviada: boolean;
+  motivo: 'ok' | 'sem-whatsapp' | 'sem-canal' | 'falha';
+}
+
 /**
  * Envia (ou reenvia) a cobrança no WhatsApp pessoal de cobrança do cliente.
  * Método "nota fiscal" também dispara o pedido de emissão para o contador.
+ * Devolve o que aconteceu DE VERDADE: enviada, sem WhatsApp cadastrado,
+ * sem canal nenhum configurado (modo simulado) ou falha no envio.
  */
-export async function sendCharge(chargeId: string): Promise<void> {
+export async function sendCharge(chargeId: string): Promise<ResultadoCobranca> {
   const store = useData.getState();
   const settings = useSettings.getState();
   const ch = store.charges.find((c) => c.id === chargeId);
-  if (!ch) return;
+  if (!ch) return { enviada: false, motivo: 'falha' };
   const client = store.clients.find((c) => c.id === ch.clientId);
-  if (!client) return;
+  if (!client) return { enviada: false, motivo: 'falha' };
 
   const reenvio = ch.status === 'enviada';
   const message = chargeMessage(ch, settings.pixKey, reenvio);
@@ -124,7 +132,7 @@ export async function sendCharge(chargeId: string): Promise<void> {
       status: 'erro',
       detail: 'Este cliente não tem WhatsApp de cobrança cadastrado. Preencha em Clientes ou pelo importador.',
     });
-    return;
+    return { enviada: false, motivo: 'sem-whatsapp' };
   }
 
   // Com o Conector, dá para ler a resposta e guardar o link da fatura que o
@@ -179,9 +187,10 @@ export async function sendCharge(chargeId: string): Promise<void> {
       status: 'simulado',
       detail: `Conecte o Conector ou o webhook do WhatsApp nas Integrações para enviar de verdade. Mensagem pronta:\n\n${message}`,
     });
+    return { enviada: false, motivo: 'sem-canal' };
   }
 
-  if (!enviouDeVerdade) return; // fica pendente — dá pra tentar de novo
+  if (!enviouDeVerdade) return { enviada: false, motivo: 'falha' }; // fica pendente — dá pra tentar de novo
 
   if (ch.method === 'nf') {
     const nfPayload = {
@@ -215,16 +224,52 @@ export async function sendCharge(chargeId: string): Promise<void> {
   }
 
   store.updateCharge(chargeId, { status: 'enviada', sentAt: Date.now() });
+  return { enviada: true, motivo: 'ok' };
 }
 
-/** Envia as cobranças do mês corrente que já venceram (ou vencem hoje) e ainda não foram pagas. */
-export async function sendAllPending(): Promise<number> {
+export interface RelatorioCobranca {
+  /** Cobranças novas geradas antes de enviar (clientes com fee que ainda não tinham a do mês). */
+  geradas: number;
+  /** Nome de cada cliente que recebeu a cobrança de verdade. */
+  enviadas: string[];
+  /** Quem não tem WhatsApp de cobrança cadastrado — precisa preencher em Clientes. */
+  semWhatsapp: string[];
+  /** Quem falhou no envio (Conector fora do ar, erro do gateway). */
+  falhas: string[];
+  /** true = não existe canal nenhum (Conector/webhook) neste navegador: NADA saiu. */
+  semCanal: boolean;
+  /** Quantas do mês já estavam pagas (não precisam de cobrança). */
+  jaPagas: number;
+}
+
+/**
+ * Cobra TODO MUNDO do mês num clique: gera as cobranças que faltarem
+ * (clientes com fee) e envia todas as não pagas — vencidas ou não, porque
+ * quem clicou em "cobrar todo mundo" quer cobrar agora, não esperar o
+ * vencimento de cada um. Devolve o relatório completo por cliente, com a
+ * verdade: quem recebeu, quem não tem WhatsApp, quem falhou — e avisa alto
+ * quando não existe canal nenhum e nada saiu (antes a tela contava
+ * tentativas como se fossem envios).
+ */
+export async function cobrarTodoMundo(): Promise<RelatorioCobranca> {
+  const geradas = generateMonthlyCharges();
   const store = useData.getState();
   const month = currentMonthKey();
-  const hoje = todayISO();
-  const pending = store.charges.filter((c) => c.month === month && c.status !== 'paga' && c.dueDate <= hoje);
-  for (const ch of pending) await sendCharge(ch.id);
-  return pending.length;
+  const doMes = store.charges.filter((c) => c.month === month);
+  const jaPagas = doMes.filter((c) => c.status === 'paga').length;
+  const nomeDe = (clientId: string) =>
+    store.clients.find((c) => c.id === clientId)?.name ?? 'cliente removido';
+
+  const relatorio: RelatorioCobranca = { geradas, enviadas: [], semWhatsapp: [], falhas: [], semCanal: false, jaPagas };
+  for (const ch of doMes.filter((c) => c.status !== 'paga')) {
+    const r = await sendCharge(ch.id);
+    const nome = nomeDe(ch.clientId);
+    if (r.enviada) relatorio.enviadas.push(nome);
+    else if (r.motivo === 'sem-whatsapp') relatorio.semWhatsapp.push(nome);
+    else if (r.motivo === 'sem-canal') { relatorio.semCanal = true; break; } // sem canal, nada vai sair: para aqui
+    else relatorio.falhas.push(nome);
+  }
+  return relatorio;
 }
 
 /**
