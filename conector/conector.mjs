@@ -12,7 +12,7 @@
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -334,9 +334,55 @@ async function listarGrupos() {
 
 /* ------------------------------ Instagram ----------------------------- */
 
-async function publicarInstagram(destino, legenda, mediaUrl) {
+/**
+ * O Instagram exige uma URL pública de verdade pra imagem — e toda foto
+ * anexada na plataforma vira um "data:" (base64) guardado no navegador,
+ * nunca um link hospedado em lugar nenhum. Sem isso, publicar sempre
+ * falharia pra qualquer foto que a própria equipe subisse. A solução:
+ * o Conector hospeda a imagem ele mesmo (pasta `midia/`, servida em
+ * /midia/<arquivo>) e usa o endereço do túnel público pra dar ao
+ * Instagram um link que ele realmente consegue baixar.
+ */
+const MIDIA_DIR = join(DIR, 'midia');
+if (!existsSync(MIDIA_DIR)) mkdirSync(MIDIA_DIR, { recursive: true });
+
+const MIME_EXT = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+
+/** Salva um "data:image/...;base64,...." em disco e devolve o nome do arquivo público. */
+function salvarMidiaPublica(dataUrl) {
+  const m = /^data:([\w/+.-]+);base64,(.+)$/s.exec(dataUrl);
+  if (!m) throw new Error('formato de imagem inválido (esperado data:image/...;base64,...)');
+  const ext = MIME_EXT[m[1]] || 'jpg';
+  const nome = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  writeFileSync(join(MIDIA_DIR, nome), Buffer.from(m[2], 'base64'));
+  return nome;
+}
+
+/** Some com mídia publicada há mais de 30 dias — não precisa guardar pra sempre. */
+function limparMidiaAntiga() {
+  const limite = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  try {
+    for (const nome of readdirSync(MIDIA_DIR)) {
+      const caminho = join(MIDIA_DIR, nome);
+      if (statSync(caminho).mtimeMs < limite) unlinkSync(caminho);
+    }
+  } catch { /* pasta vazia ou passageira: sem problema */ }
+}
+limparMidiaAntiga();
+setInterval(limparMidiaAntiga, 24 * 60 * 60 * 1000);
+
+async function publicarInstagram(destino, legenda, mediaUrlOriginal) {
   if (!config.igUserId || !config.igToken) throw new Error('Instagram não configurado no conector');
-  if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) {
+  if (!mediaUrlOriginal) throw new Error('post sem imagem anexada — anexe uma foto antes de publicar');
+
+  let mediaUrl = mediaUrlOriginal;
+  if (mediaUrlOriginal.startsWith('data:')) {
+    if (!tunel.url) {
+      throw new Error('o túnel do Conector ainda não abriu — aguarde alguns segundos e tente de novo (a imagem precisa de um endereço público pro Instagram acessar)');
+    }
+    const nome = salvarMidiaPublica(mediaUrlOriginal);
+    mediaUrl = `${tunel.url}/midia/${nome}`;
+  } else if (!/^https?:\/\//i.test(mediaUrl)) {
     throw new Error('a imagem precisa estar numa URL pública (o Instagram não aceita arquivo colado)');
   }
 
@@ -1196,7 +1242,10 @@ const servidor = createServer(async (req, res) => {
   // /entrada e /entrada-pagamento têm o próprio token (endereço fixo dado
   // aos serviços externos) e continuam liberados aqui — sem eles a Z-API e
   // o Asaas nunca conseguiriam entregar nada.
-  const rotaComTokenProprio = url.pathname === '/entrada' || url.pathname === '/entrada-pagamento';
+  // /midia/ também fica de fora: é o servidor do Instagram que busca essas
+  // imagens pra publicar, e ele não manda token nenhum. O nome do arquivo
+  // (data + parte aleatória) já não é adivinhável.
+  const rotaComTokenProprio = url.pathname === '/entrada' || url.pathname === '/entrada-pagamento' || url.pathname.startsWith('/midia/');
   // Pedido vindo de FORA desta máquina (túnel público ou rede) exige o
   // token sempre, mesmo sem EXIGIR_TOKEN — sem isso, qualquer um que
   // descobrisse o endereço do túnel leria (e mudaria) os dados da equipe
@@ -1253,6 +1302,21 @@ const servidor = createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, resultado }));
+  }
+
+  // Serve as imagens hospedadas pelo próprio Conector pra publicar no
+  // Instagram (salvarMidiaPublica) — link público de verdade que o
+  // Instagram consegue baixar, mesmo a foto tendo sido anexada como
+  // arquivo (base64) na plataforma.
+  if (url.pathname.startsWith('/midia/') && req.method === 'GET') {
+    const nome = url.pathname.slice('/midia/'.length);
+    if (!/^[\w.-]+$/.test(nome)) { res.writeHead(400); return res.end(); }
+    const caminho = join(MIDIA_DIR, nome);
+    if (!existsSync(caminho)) { res.writeHead(404); return res.end(); }
+    const ext = nome.split('.').pop();
+    const tipo = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }[ext] || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': tipo, 'Cache-Control': 'public, max-age=2592000' });
+    return res.end(readFileSync(caminho));
   }
 
   // Sincronização de clientes/posts/vídeos/financeiro/biblioteca/campanhas/
