@@ -21,6 +21,8 @@ import type {
 } from './types';
 import { uid, acharPorNome, normalizarNome } from './utils';
 import { seedData, OLD_BRIEFINGS } from './seed';
+import { useOnboardingTemplate } from './onboardingTemplate';
+import { useAuth } from './authStore';
 
 /** Todo tipo de registro que participa da sincronização com o Conector. */
 type TipoRegistro = 'post' | 'video' | 'cliente' | 'transacao' | 'cobranca' | 'biblioteca' | 'campanha';
@@ -74,6 +76,14 @@ interface DataState {
   addClient: (c: Omit<Client, 'id' | 'createdAt'>) => Client;
   updateClient: (id: string, patch: Partial<Client>) => void;
   removeClient: (id: string) => void;
+
+  // Checklist de onboarding do cliente
+  /** Aplica o modelo padrão a todo cliente que ainda não tem checklist própria (nunca mexe em quem já tem, mesmo vazia). */
+  ensureOnboardingChecklists: () => void;
+  toggleOnboardingItem: (clientId: string, itemId: string) => void;
+  addOnboardingItem: (clientId: string, section: string, text: string) => void;
+  editOnboardingItem: (clientId: string, itemId: string, text: string) => void;
+  removeOnboardingItem: (clientId: string, itemId: string) => void;
 
   // Quadros
   addBoard: (b: { name: string; description?: string; clientId?: string; area?: BoardArea }) => Board;
@@ -385,7 +395,15 @@ export const useData = create<DataState>()(
 
       // ---------- Clientes ----------
       addClient: (c) => {
-        const client: Client = { ...c, id: uid('cli'), createdAt: Date.now(), updatedAt: Date.now() };
+        const client: Client = {
+          ...c,
+          id: uid('cli'),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          // Todo cliente nasce com uma cópia própria do modelo padrão de
+          // onboarding — editar o modelo depois não mexe em quem já existe.
+          onboardingChecklist: c.onboardingChecklist ?? useOnboardingTemplate.getState().cloneForClient(),
+        };
         set((s) => ({ clients: [...s.clients, client] }));
         return client;
       },
@@ -396,6 +414,77 @@ export const useData = create<DataState>()(
       removeClient: (id) => {
         marcarExcluido('cliente', id);
         set((s) => ({ clients: s.clients.filter((c) => c.id !== id) }));
+      },
+
+      ensureOnboardingChecklists: () => {
+        const tmpl = useOnboardingTemplate.getState();
+        set((s) => ({
+          clients: s.clients.map((c) =>
+            c.onboardingChecklist === undefined
+              ? { ...c, onboardingChecklist: tmpl.cloneForClient(), updatedAt: Date.now() }
+              : c,
+          ),
+        }));
+      },
+      toggleOnboardingItem: (clientId, itemId) => {
+        const client = get().clients.find((c) => c.id === clientId);
+        const item = client?.onboardingChecklist?.find((i) => i.id === itemId);
+        if (!client || !item) return;
+        const done = !item.done;
+        set((s) => ({
+          clients: s.clients.map((c) =>
+            c.id === clientId
+              ? {
+                  ...c,
+                  onboardingChecklist: (c.onboardingChecklist ?? []).map((i) => (i.id === itemId ? { ...i, done } : i)),
+                  updatedAt: Date.now(),
+                }
+              : c,
+          ),
+        }));
+        const quem = useAuth.getState().current()?.name ?? 'Alguém';
+        get().addEvent({
+          channel: 'sistema',
+          title: `Checklist · ${client.name}`,
+          detail: `${quem} ${done ? 'concluiu' : 'reabriu'} "${item.text}"`,
+          status: 'ok',
+        });
+      },
+      addOnboardingItem: (clientId, section, text) => {
+        if (!text.trim()) return;
+        set((s) => ({
+          clients: s.clients.map((c) =>
+            c.id === clientId
+              ? {
+                  ...c,
+                  onboardingChecklist: [...(c.onboardingChecklist ?? []), { id: uid('oci'), section, text: text.trim(), done: false }],
+                  updatedAt: Date.now(),
+                }
+              : c,
+          ),
+        }));
+      },
+      editOnboardingItem: (clientId, itemId, text) => {
+        set((s) => ({
+          clients: s.clients.map((c) =>
+            c.id === clientId
+              ? {
+                  ...c,
+                  onboardingChecklist: (c.onboardingChecklist ?? []).map((i) => (i.id === itemId ? { ...i, text } : i)),
+                  updatedAt: Date.now(),
+                }
+              : c,
+          ),
+        }));
+      },
+      removeOnboardingItem: (clientId, itemId) => {
+        set((s) => ({
+          clients: s.clients.map((c) =>
+            c.id === clientId
+              ? { ...c, onboardingChecklist: (c.onboardingChecklist ?? []).filter((i) => i.id !== itemId), updatedAt: Date.now() }
+              : c,
+          ),
+        }));
       },
 
       // ---------- Quadros ----------
