@@ -94,7 +94,7 @@ export default function ClientChecklist() {
         subtitle="Onboarding e entrega de cada cliente, do zero ao concluído, em um único lugar."
         action={
           <>
-            <Button variant="outline" onClick={() => setTemplateOpen(true)}><Settings2 size={16} /> Modelo padrão</Button>
+            <Button variant="outline" onClick={() => setTemplateOpen(true)}><Settings2 size={16} className="text-brand-300" /> Modelo padrão</Button>
             <Button onClick={() => setNewOpen(true)}><Plus size={16} /> Novo cliente</Button>
           </>
         }
@@ -112,7 +112,7 @@ export default function ClientChecklist() {
         {/* Roster */}
         <div className="card flex flex-col p-3">
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-line bg-ink-800/70 px-3 py-2">
-            <Search size={15} className="text-white/35" />
+            <Search size={15} className="text-brand-300/70" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -389,7 +389,7 @@ function TemplateModal({ open, onClose }: { open: boolean; onClose: () => void }
           variant="outline"
           onClick={() => { if (newSection.trim()) { addSection(newSection); setNewSection(''); } }}
         >
-          <Plus size={15} /> Seção
+          <Plus size={15} className="text-brand-300" /> Seção
         </Button>
       </div>
     </Modal>
