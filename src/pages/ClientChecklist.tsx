@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ClipboardCheck, Plus, Search, Trash2, X, Settings2, History,
+  ClipboardCheck, Plus, Search, Trash2, X, Settings2, History, Users, Camera,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { Button, Input, Modal, Field, Badge, Stat, EmptyState, Avatar } from '@/components/ui';
+import { Button, Input, Modal, Field, Badge, Stat, EmptyState, Avatar, comprimirImagem } from '@/components/ui';
 import { useData } from '@/lib/dataStore';
 import { useOnboardingTemplate } from '@/lib/onboardingTemplate';
 import { ONBOARDING_STATUS_META, type OnboardingStatus } from '@/lib/labels';
@@ -39,7 +39,7 @@ function bySection(items: OnboardingChecklistItem[]) {
 
 export default function ClientChecklist() {
   const {
-    clients, addClient, removeClient, events, ensureOnboardingChecklists,
+    clients, addClient, updateClient, removeClient, events, ensureOnboardingChecklists,
     toggleOnboardingItem, addOnboardingItem, editOnboardingItem, removeOnboardingItem,
   } = useData();
   useEffect(() => { ensureOnboardingChecklists(); }, [ensureOnboardingChecklists]);
@@ -48,7 +48,9 @@ export default function ClientChecklist() {
   const [filter, setFilter] = useState<'todos' | OnboardingStatus>('todos');
   const [newOpen, setNewOpen] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newPhoto, setNewPhoto] = useState('');
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState('');
 
   const filtered = useMemo(() => {
     return clients.filter((c) => {
@@ -75,9 +77,10 @@ export default function ClientChecklist() {
   function criarCliente() {
     if (!newName.trim()) return;
     const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
-    const client = addClient({ name: newName.trim(), color });
+    const client = addClient({ name: newName.trim(), color, photoUrl: newPhoto || undefined });
     setSelectedId(client.id);
     setNewName('');
+    setNewPhoto('');
     setNewOpen(false);
   }
 
@@ -87,6 +90,13 @@ export default function ClientChecklist() {
     if (selectedId === c.id) setSelectedId(null);
   }
 
+  function adicionarTodosOsClientes() {
+    const n = ensureOnboardingChecklists();
+    setBulkMsg(n === 0
+      ? 'Todo mundo já está na lista: nenhum cliente novo para adicionar.'
+      : `${n} cliente(s) adicionado(s) com o modelo padrão de checklist.`);
+  }
+
   return (
     <div>
       <PageHeader
@@ -94,11 +104,16 @@ export default function ClientChecklist() {
         subtitle="Onboarding e entrega de cada cliente, do zero ao concluído, em um único lugar."
         action={
           <>
+            <Button variant="outline" onClick={adicionarTodosOsClientes}><Users size={16} className="text-brand-300" /> Adicionar todos os clientes</Button>
             <Button variant="outline" onClick={() => setTemplateOpen(true)}><Settings2 size={16} className="text-brand-300" /> Modelo padrão</Button>
             <Button onClick={() => setNewOpen(true)}><Plus size={16} /> Novo cliente</Button>
           </>
         }
       />
+
+      {bulkMsg && (
+        <p className="mb-4 rounded-lg border border-line bg-white/[0.02] px-3.5 py-2.5 text-sm text-white/70">{bulkMsg}</p>
+      )}
 
       {/* Dashboard */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -151,7 +166,7 @@ export default function ClientChecklist() {
                       selectedId === c.id ? 'bg-brand-500/15' : 'hover:bg-white/5',
                     )}
                   >
-                    <Avatar name={c.name} color={c.color} size={32} />
+                    <Avatar name={c.name} color={c.color} photoUrl={c.photoUrl} size={32} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-medium text-white">{c.name}</span>
@@ -185,6 +200,7 @@ export default function ClientChecklist() {
               onEdit={(itemId, text) => editOnboardingItem(selected.id, itemId, text)}
               onRemove={(itemId) => removeOnboardingItem(selected.id, itemId)}
               onDelete={() => excluirCliente(selected)}
+              onSetPhoto={(photoUrl) => updateClient(selected.id, { photoUrl })}
             />
           )}
 
@@ -214,15 +230,20 @@ export default function ClientChecklist() {
         title="Novo cliente"
         footer={<Button onClick={criarCliente}>Criar checklist</Button>}
       >
-        <Field label="Nome do cliente">
-          <Input
-            autoFocus
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && criarCliente()}
-            placeholder="Ex.: Vidroscar"
-          />
-        </Field>
+        <div className="flex items-center gap-3">
+          <PhotoPicker photoUrl={newPhoto} name={newName || 'Novo cliente'} onChange={setNewPhoto} />
+          <div className="flex-1">
+            <Field label="Nome do cliente">
+              <Input
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && criarCliente()}
+                placeholder="Ex.: Vidroscar"
+              />
+            </Field>
+          </div>
+        </div>
         <p className="mt-2 text-xs text-white/40">
           A checklist nasce com o modelo padrão — dá para personalizar depois. Um cadastro completo (contato, cadência, cobrança) é feito em <Link to="/app/clientes" className="text-brand-300 hover:text-brand-200">Clientes</Link>.
         </p>
@@ -235,7 +256,7 @@ export default function ClientChecklist() {
 }
 
 function ClientPanel({
-  client, onToggle, onAdd, onEdit, onRemove, onDelete,
+  client, onToggle, onAdd, onEdit, onRemove, onDelete, onSetPhoto,
 }: {
   client: Client;
   onToggle: (itemId: string) => void;
@@ -243,6 +264,7 @@ function ClientPanel({
   onEdit: (itemId: string, text: string) => void;
   onRemove: (itemId: string) => void;
   onDelete: () => void;
+  onSetPhoto: (photoUrl: string) => void;
 }) {
   const items = client.onboardingChecklist ?? [];
   const p = progressOf(client);
@@ -254,7 +276,7 @@ function ClientPanel({
       <div className="card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Avatar name={client.name} color={client.color} size={44} />
+            <PhotoPicker photoUrl={client.photoUrl} name={client.name} color={client.color} size={44} onChange={onSetPhoto} />
             <div>
               <h2 className="text-xl font-semibold text-white">{client.name}</h2>
               <div className="mt-1 flex items-center gap-2">
@@ -330,6 +352,42 @@ function ClientPanel({
           <EmptyState icon={<ClipboardCheck size={32} />} title="Checklist vazia" description="Adicione seções no modelo padrão ou crie o cliente novamente." />
         )}
       </div>
+    </div>
+  );
+}
+
+/** Avatar clicável: mostra a foto (ou as iniciais) e um botão de câmera no canto para trocar. */
+function PhotoPicker({
+  photoUrl, name, color = '#3f3f46', size = 56, onChange,
+}: {
+  photoUrl?: string;
+  name: string;
+  color?: string;
+  size?: number;
+  onChange: (dataUrl: string) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const dataUrl = await comprimirImagem(file);
+    if (dataUrl) onChange(dataUrl);
+  }
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+      <Avatar name={name} color={color} size={size} photoUrl={photoUrl} />
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full border-2 border-ink-900 bg-brand-500 text-white hover:bg-brand-400"
+        title={photoUrl ? 'Trocar foto' : 'Adicionar foto'}
+      >
+        <Camera size={12} />
+      </button>
     </div>
   );
 }

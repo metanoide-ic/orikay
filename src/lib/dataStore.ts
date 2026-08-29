@@ -78,8 +78,8 @@ interface DataState {
   removeClient: (id: string) => void;
 
   // Checklist de onboarding do cliente
-  /** Aplica o modelo padrão a todo cliente que ainda não tem checklist própria (nunca mexe em quem já tem, mesmo vazia). */
-  ensureOnboardingChecklists: () => void;
+  /** Aplica o modelo padrão a todo cliente que ainda não tem checklist própria (nunca mexe em quem já tem, mesmo vazia). Devolve quantos clientes receberam a checklist agora. */
+  ensureOnboardingChecklists: () => number;
   toggleOnboardingItem: (clientId: string, itemId: string) => void;
   addOnboardingItem: (clientId: string, section: string, text: string) => void;
   editOnboardingItem: (clientId: string, itemId: string, text: string) => void;
@@ -418,13 +418,15 @@ export const useData = create<DataState>()(
 
       ensureOnboardingChecklists: () => {
         const tmpl = useOnboardingTemplate.getState();
+        let count = 0;
         set((s) => ({
-          clients: s.clients.map((c) =>
-            c.onboardingChecklist === undefined
-              ? { ...c, onboardingChecklist: tmpl.cloneForClient(), updatedAt: Date.now() }
-              : c,
-          ),
+          clients: s.clients.map((c) => {
+            if (c.onboardingChecklist !== undefined) return c;
+            count++;
+            return { ...c, onboardingChecklist: tmpl.cloneForClient(), updatedAt: Date.now() };
+          }),
         }));
+        return count;
       },
       toggleOnboardingItem: (clientId, itemId) => {
         const client = get().clients.find((c) => c.id === clientId);

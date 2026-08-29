@@ -72,6 +72,8 @@ export interface Client {
    * muda quem já foi criado.
    */
   onboardingChecklist?: OnboardingChecklistItem[];
+  /** Foto do cliente (data URL, já comprimida) — quando ausente, a UI cai para o avatar de iniciais. */
+  photoUrl?: string;
 }
 
 /** Um item da checklist de onboarding de um cliente específico. */
