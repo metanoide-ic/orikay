@@ -422,12 +422,16 @@ const TOOLS: ToolDef[] = [
       type: 'function',
       function: {
         name: 'excluir_item',
-        description: 'Exclui definitivamente um post ou vídeo. AÇÃO SENSÍVEL: sempre confirmada antes de rodar. Prefira "arquivar" (via atualizar_post/atualizar_video) quando der.',
+        description:
+          'Exclui definitivamente um post, vídeo OU CLIENTE (id ou nome). AÇÃO SENSÍVEL: sempre ' +
+          'confirmada antes de rodar. Excluir um cliente tira ele da carteira; os posts, vídeos e ' +
+          'lançamentos que já existiam continuam no sistema, só perdem o vínculo com o cliente — não ' +
+          'apaga o histórico junto. Prefira "arquivar" (via atualizar_post/atualizar_video) pra post/vídeo quando der.',
         parameters: {
           type: 'object',
           properties: {
-            tipo: { type: 'string', enum: ['post', 'video'] },
-            id: { type: 'string' },
+            tipo: { type: 'string', enum: ['post', 'video', 'cliente'] },
+            id: { type: 'string', description: 'Id do item. Para cliente, também aceita o nome (use listar_clientes se não tiver certeza).' },
           },
           required: ['tipo', 'id'],
         },
@@ -439,9 +443,16 @@ const TOOLS: ToolDef[] = [
       if (args.tipo === 'post') {
         if (!achar(store.posts, String(args.id))) return { erro: 'Post não encontrado.' };
         store.removePost(String(args.id));
-      } else {
+      } else if (args.tipo === 'video') {
         if (!achar(store.videos, String(args.id))) return { erro: 'Vídeo não encontrado.' };
         store.removeVideo(String(args.id));
+      } else if (args.tipo === 'cliente') {
+        const c = acharCliente(String(args.id));
+        if (!c) return { erro: 'Cliente não encontrado. Confira com listar_clientes.' };
+        store.removeClient(c.id);
+        return { ok: true, removido: c.name };
+      } else {
+        return { erro: 'Tipo inválido — use "post", "video" ou "cliente".' };
       }
       return { ok: true };
     },
