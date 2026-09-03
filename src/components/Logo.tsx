@@ -36,7 +36,7 @@ export function Logo({
       <LogoMark className={mark} />
       <div className="leading-none">
         <div className={cn('font-display font-semibold tracking-tight text-ink-50', word)}>
-          Orikay
+          Origem
         </div>
         {showTagline && (
           <div className="mt-1 text-[9px] font-medium tracking-[0.28em] text-ink-400">

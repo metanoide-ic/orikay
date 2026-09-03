@@ -65,6 +65,24 @@ export interface Client {
   createdAt: number;
   /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
   updatedAt?: number;
+  /**
+   * Checklist de onboarding/entrega deste cliente — nasce como uma cópia do
+   * modelo padrão (`lib/onboardingTemplate.ts`) no momento em que o cliente
+   * é cadastrado, e daí em diante é só dele: editar o modelo depois não
+   * muda quem já foi criado.
+   */
+  onboardingChecklist?: OnboardingChecklistItem[];
+  /** Foto do cliente (data URL, já comprimida) — quando ausente, a UI cai para o avatar de iniciais. */
+  photoUrl?: string;
+}
+
+/** Um item da checklist de onboarding de um cliente específico. */
+export interface OnboardingChecklistItem {
+  id: ID;
+  /** Nome da seção (ex.: "Cadastro & Contrato") — agrupa a exibição. */
+  section: string;
+  text: string;
+  done: boolean;
 }
 
 // -------------------------- Cobrança ----------------------------------

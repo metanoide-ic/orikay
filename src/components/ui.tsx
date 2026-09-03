@@ -408,11 +408,25 @@ export function Avatar({
   name,
   color,
   size = 32,
+  photoUrl,
 }: {
   name: string;
   color: string;
   size?: number;
+  /** Foto do cliente/conta (data URL) — quando ausente, cai para o círculo de iniciais. */
+  photoUrl?: string;
 }) {
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        title={name}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   return (
     <div
       className="grid place-items-center rounded-full font-semibold text-white shrink-0"

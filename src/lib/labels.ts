@@ -85,6 +85,15 @@ export function resolveOrder<T extends string>(saved: string[], padrao: T[]): T[
   return resultado.length === padrao.length ? resultado : padrao;
 }
 
+/** Status calculado da checklist de onboarding de um cliente, a partir do que já foi concluído. */
+export type OnboardingStatus = 'pendente' | 'andamento' | 'concluido';
+
+export const ONBOARDING_STATUS_META: Record<OnboardingStatus, { label: string; color: string }> = {
+  pendente: { label: 'Não iniciado', color: '#94a3b8' },
+  andamento: { label: 'Em andamento', color: '#38bdf8' },
+  concluido: { label: 'Concluído', color: '#10b981' },
+};
+
 export const BOARD_AREA_META: Record<BoardArea, { label: string }> = {
   designer: { label: 'Designer' },
   filmmaker: { label: 'Filmmaker' },

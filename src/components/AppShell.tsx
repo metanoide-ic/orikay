@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   KanbanSquare, Wallet, Users, Settings, LogOut,
-  Menu, X, Clapperboard, Library, Zap, Plug, Bell, AlertTriangle, Building2, Megaphone, ListChecks,
+  Menu, X, Clapperboard, Library, Zap, Plug, Bell, AlertTriangle, Building2, Megaphone, ListChecks, ClipboardCheck,
 } from 'lucide-react';
 import { Logo, LogoMark } from './Logo';
 import { Avatar } from './ui';
@@ -35,6 +35,7 @@ function useNav(): NavDef[] {
   items.push(
     { to: '/app/automacoes', label: 'Automações', icon: Zap },
     { to: '/app/clientes', label: 'Clientes', icon: Building2 },
+    { to: '/app/checklist-clientes', label: 'Checklist de Clientes', icon: ClipboardCheck },
     { to: '/app/equipe', label: 'Equipe', icon: Users },
     { to: '/app/integracoes', label: 'Integrações', icon: Plug },
   );

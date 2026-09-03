@@ -14,6 +14,7 @@ import Automations from '@/pages/Automations';
 import Traffic from '@/pages/Traffic';
 import Clients from '@/pages/Clients';
 import ClientDetail from '@/pages/ClientDetail';
+import ClientChecklist from '@/pages/ClientChecklist';
 import Team from '@/pages/Team';
 import Integrations from '@/pages/Integrations';
 import Settings from '@/pages/Settings';
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="/app/automacoes" element={<Protected><Automations /></Protected>} />
         <Route path="/app/clientes" element={<Protected><Clients /></Protected>} />
         <Route path="/app/clientes/:clientId" element={<Protected><ClientDetail /></Protected>} />
+        <Route path="/app/checklist-clientes" element={<Protected><ClientChecklist /></Protected>} />
         <Route path="/app/equipe" element={<Protected><Team /></Protected>} />
         <Route path="/app/financeiro" element={<Protected><FinanceGuard /></Protected>} />
         <Route path="/app/integracoes" element={<Protected><Integrations /></Protected>} />
