@@ -24,7 +24,7 @@ export default defineConfig({
       manifest: {
         name: 'Orikay',
         short_name: 'Orikay',
-        description: 'Gestão de posts, vídeos, quadros e financeiro da agência Origem.',
+        description: 'Organização de agências: posts, vídeos, aprovação, publicação e financeiro de cada cliente.',
         theme_color: '#0a0a12',
         background_color: '#0a0a12',
         display: 'standalone',
