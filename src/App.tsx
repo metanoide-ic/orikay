@@ -18,8 +18,27 @@ import ClientChecklist from '@/pages/ClientChecklist';
 import Team from '@/pages/Team';
 import Integrations from '@/pages/Integrations';
 import Settings from '@/pages/Settings';
+import { NUVEM } from '@/lib/nuvem/cliente';
+import { useSessao } from '@/lib/nuvem/sessao';
+import { Carregando, ConvitePagina, Entrar, NovaSenha, SemAgencia } from '@/pages/Acesso';
+import EquipeNuvem from '@/pages/EquipeNuvem';
 
 function Protected({ children }: { children: React.ReactNode }) {
+  return NUVEM ? <ProtegidoNuvem>{children}</ProtegidoNuvem> : <ProtegidoLocal>{children}</ProtegidoLocal>;
+}
+
+/** Na nuvem quem manda é a sessão do Supabase, não o que ficou salvo no navegador. */
+function ProtegidoNuvem({ children }: { children: React.ReactNode }) {
+  const fase = useSessao((s) => s.fase);
+  const location = useLocation();
+  if (fase === 'carregando') return <Carregando />;
+  if (fase === 'nova-senha') return <NovaSenha />;
+  if (fase === 'deslogado') return <Navigate to="/entrar" replace state={{ from: location }} />;
+  if (fase === 'sem-agencia') return <SemAgencia />;
+  return <AppShell>{children}</AppShell>;
+}
+
+function ProtegidoLocal({ children }: { children: React.ReactNode }) {
   const currentId = useAuth((s) => s.currentId);
   const precisaTrocar = useAuth((s) => s.current()?.mustChangePassword);
   const location = useLocation();
@@ -49,14 +68,30 @@ function NoAccess() {
   );
 }
 
+/** /entrar: tela de acesso, ou direto para a plataforma se já estiver dentro. */
+function TelaEntrar() {
+  const fase = useSessao((s) => s.fase);
+  if (!NUVEM) return <Auth />;
+  if (fase === 'carregando') return <Carregando />;
+  if (fase === 'nova-senha') return <NovaSenha />;
+  if (fase === 'deslogado') return <Entrar />;
+  return <Navigate to="/app/posts" replace />;
+}
+
 export default function App() {
   const location = useLocation();
-  const currentId = useAuth((s) => s.currentId);
+  const currentLocal = useAuth((s) => s.currentId);
+  const fase = useSessao((s) => s.fase);
+  const currentId = NUVEM ? (fase === 'pronta' || fase === 'sem-agencia' ? 'nuvem' : null) : currentLocal;
+
+  // Link de "esqueci a senha" volta para a página inicial: abre a tela da senha nova.
+  if (NUVEM && fase === 'nova-senha') return <NovaSenha />;
 
   return (
     <Routes location={location}>
         <Route path="/" element={currentId ? <Navigate to="/app/posts" replace /> : <Landing />} />
-        <Route path="/entrar" element={currentId ? <Navigate to="/app/posts" replace /> : <Auth />} />
+        <Route path="/entrar" element={<TelaEntrar />} />
+        <Route path="/convite/:token" element={NUVEM ? <ConvitePagina /> : <Navigate to="/entrar" replace />} />
 
         {/* O quadro de posts é a tela principal da plataforma. */}
         <Route path="/app" element={<Navigate to="/app/posts" replace />} />
@@ -69,7 +104,7 @@ export default function App() {
         <Route path="/app/clientes" element={<Protected><Clients /></Protected>} />
         <Route path="/app/clientes/:clientId" element={<Protected><ClientDetail /></Protected>} />
         <Route path="/app/checklist-clientes" element={<Protected><ClientChecklist /></Protected>} />
-        <Route path="/app/equipe" element={<Protected><Team /></Protected>} />
+        <Route path="/app/equipe" element={<Protected>{NUVEM ? <EquipeNuvem /> : <Team />}</Protected>} />
         <Route path="/app/financeiro" element={<Protected><FinanceGuard /></Protected>} />
         <Route path="/app/integracoes" element={<Protected><Integrations /></Protected>} />
         <Route path="/app/config" element={<Protected><Settings /></Protected>} />

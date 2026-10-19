@@ -23,10 +23,13 @@ export function LogoMark({ className }: { className?: string }) {
 export function Logo({
   className,
   showTagline = true,
+  tagline,
   size = 'md',
 }: {
   className?: string;
   showTagline?: boolean;
+  /** Linha de baixo (na plataforma, o nome da agência). */
+  tagline?: string;
   size?: 'sm' | 'md' | 'lg';
 }) {
   const mark = { sm: 'h-8 w-8', md: 'h-10 w-10', lg: 'h-14 w-14' }[size];
@@ -36,11 +39,11 @@ export function Logo({
       <LogoMark className={mark} />
       <div className="leading-none">
         <div className={cn('font-display font-semibold tracking-tight text-ink-50', word)}>
-          Origem
+          Orikay
         </div>
-        {showTagline && (
-          <div className="mt-1 text-[9px] font-medium tracking-[0.28em] text-ink-400">
-            COMUNICAÇÃO &amp; MARKETING
+        {showTagline && tagline && (
+          <div className="mt-1 max-w-[11rem] truncate text-[9px] font-medium uppercase tracking-[0.22em] text-ink-400">
+            {tagline}
           </div>
         )}
       </div>

@@ -4,6 +4,9 @@ import { useSettings } from './settingsStore';
 import { onApproved, onRejected } from './automations';
 import { markChargePaid } from './billing';
 import { uid } from './utils';
+import { useAuth } from './authStore';
+import { NUVEM } from './nuvem/cliente';
+import { useNuvemStatus } from './nuvem/sincronizar';
 
 /** Resposta do grupo sobre um post. */
 interface PostDecision {
@@ -66,7 +69,10 @@ export async function pullDecisions(): Promise<number> {
 
   let lista: Decision[] = [];
   try {
-    const res = await fetch(connectorPath(connectorUrl, '/decisoes'));
+    // Quem não tem Financeiro não enxerga cobranças: deixa os avisos de
+    // pagamento na fila do Conector para quem tem.
+    const veCobrancas = Boolean(useAuth.getState().current()?.canFinance);
+    const res = await fetch(connectorPath(connectorUrl, `/decisoes${veCobrancas ? '' : '?pagamentos=0'}`));
     const data = await res.json();
     if (!data?.ok) return 0;
     lista = data.decisoes ?? [];
@@ -116,9 +122,12 @@ const INTERVALO = 20_000;
 /** Mantém a plataforma ouvindo as respostas do grupo enquanto estiver aberta. */
 export function useApprovalInbox(): void {
   const connectorUrl = useSettings((s) => s.connectorUrl);
+  // Na nuvem, só busca depois que a agência carregou: com o aparelho ainda
+  // vazio, a resposta do cliente chegaria antes do post e seria descartada.
+  const carregado = useNuvemStatus((s) => s.carregado) || !NUVEM;
 
   useEffect(() => {
-    if (!connectorUrl) return;
+    if (!connectorUrl || !carregado) return;
     let vivo = true;
 
     async function ciclo() {
@@ -129,5 +138,5 @@ export function useApprovalInbox(): void {
     void ciclo();
     const id = setInterval(ciclo, INTERVALO);
     return () => { vivo = false; clearInterval(id); };
-  }, [connectorUrl]);
+  }, [connectorUrl, carregado]);
 }

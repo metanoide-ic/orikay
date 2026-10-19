@@ -12,7 +12,8 @@
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, renameSync } from 'node:fs';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -53,8 +54,10 @@ const CONFIG_PADRAO = {
   entradaToken: '',
   /** Liga o túnel sozinho ao abrir o conector. */
   tunelAutomatico: true,
-  /** Data (ISO, segunda-feira) da última pergunta semanal da Terça da Sorte já enviada — pra nunca perguntar duas vezes na mesma semana. */
-  tercaDaSorteUltimoEnvio: '',
+  /** Mensagens automáticas semanais (vêm da plataforma por POST /agenda). */
+  agenda: [],
+  /** Último dia (AAAA-MM-DD) em que cada mensagem automática saiu, por id. */
+  agendaEnviados: {},
   /**
    * IA da equipe (OpenAI ou compatível): a chave fica gravada AQUI, no
    * conector.config.json (fora do Git de propósito — chave em repositório
@@ -67,17 +70,40 @@ const CONFIG_PADRAO = {
   iaModelo: '',
 };
 
+/**
+ * Grava em arquivo temporário e troca de nome: se o computador desligar ou
+ * o OneDrive travar o arquivo no meio, o antigo continua inteiro (antes,
+ * uma gravação pela metade apagava todas as credenciais).
+ */
+function gravarArquivo(arquivo, conteudo) {
+  const tmp = `${arquivo}.tmp`;
+  writeFileSync(tmp, conteudo);
+  renameSync(tmp, arquivo);
+}
+
 function lerConfig() {
   if (!existsSync(CONFIG_FILE)) return { ...CONFIG_PADRAO };
   try {
     return { ...CONFIG_PADRAO, ...JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) };
   } catch {
+    // Arquivo corrompido: guarda uma cópia em vez de sobrescrever com o
+    // padrão (o que apagava todas as credenciais sem aviso).
+    const copia = `${CONFIG_FILE}.corrompido-${Date.now()}`;
+    try { renameSync(CONFIG_FILE, copia); } catch { /* segue */ }
+    console.log(`  ATENÇÃO: a configuração estava corrompida. Cópia guardada em ${copia}.`);
     return { ...CONFIG_PADRAO };
   }
 }
 
 function gravarConfig(cfg) {
-  writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  try { gravarArquivo(CONFIG_FILE, JSON.stringify(cfg, null, 2)); } catch (e) { console.log(`  Falha ao gravar a configuração: ${e.message}`); }
+}
+
+/** Compara segredos sem vazar, pelo tempo de resposta, quantos caracteres bateram. */
+function segredoIgual(a, b) {
+  const x = Buffer.from(String(a ?? ''));
+  const y = Buffer.from(String(b ?? ''));
+  return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
 }
 
 let config = lerConfig();
@@ -85,7 +111,7 @@ let config = lerConfig();
 // Segredo do endereço de entrada: sem ele, qualquer um que descobrisse o
 // endereço público conseguiria aprovar posts.
 if (!config.entradaToken) {
-  config.entradaToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  config.entradaToken = randomBytes(18).toString('hex');
   gravarConfig(config);
 }
 
@@ -136,8 +162,17 @@ function gravarDadosCompartilhados() {
   // Debounce simples: várias sincronizações em sequência não batem disco toda hora.
   if (gravarDadosPendente) clearTimeout(gravarDadosPendente);
   gravarDadosPendente = setTimeout(() => {
-    try { writeFileSync(DADOS_FILE, JSON.stringify(dadosCompartilhados)); } catch (e) { registrar('sync', `falha ao gravar dados: ${e.message}`, false); }
+    gravarDadosPendente = null;
+    try { gravarArquivo(DADOS_FILE, JSON.stringify(dadosCompartilhados)); } catch (e) { registrar('sync', `falha ao gravar dados: ${e.message}`, false); }
   }, 500);
+}
+
+/** Grava já o que estiver esperando (ao fechar o Conector). */
+function gravarDadosAgora() {
+  if (!gravarDadosPendente) return;
+  clearTimeout(gravarDadosPendente);
+  gravarDadosPendente = null;
+  try { gravarArquivo(DADOS_FILE, JSON.stringify(dadosCompartilhados)); } catch { /* fechando de qualquer jeito */ }
 }
 
 /** Mescla uma lista por id: ganha quem tem `updatedAt` mais recente. Sem updatedAt nos dois, o que já estava aqui prevalece. */
@@ -151,7 +186,8 @@ function mesclarLista(atuais, recebidos, excluidos) {
 }
 
 function mesclarDados(recebido) {
-  const tombstonesTodos = [...dadosCompartilhados.tombstones, ...(recebido.tombstones || [])];
+  const tombstonesTodos = [...dadosCompartilhados.tombstones, ...(recebido.tombstones || [])]
+    .sort((a, b) => (b.quando ?? 0) - (a.quando ?? 0)); // mais recentes primeiro: o corte em 500 descarta as velhas
   const vistos = new Set();
   const tombstonesUnicos = tombstonesTodos.filter((t) => {
     const chave = `${t.tipo}:${t.id}`;
@@ -226,26 +262,14 @@ async function enviarWhatsapp(numero, mensagem) {
   if (!res.ok) throw new Error(`Evolution respondeu ${res.status}: ${(await res.text()).slice(0, 160)}`);
 }
 
-/* --------------------- Pergunta semanal da Terça da Sorte --------------------- */
+/* ------------------- Mensagens automáticas semanais ------------------- */
 
 /**
- * A Rede de Postos Margarida tem a promoção "Terça da Sorte" toda semana —
- * antes de produzir a arte de segunda, alguém da equipe precisa perguntar
- * pro cliente os valores daquela semana. Isso vivia só na memória de quem
- * lembrasse; agora o Conector pergunta sozinho: toda segunda-feira, a
- * partir das 9h (horário de Brasília), manda a pergunta pro grupo do
- * WhatsApp desse cliente — uma vez só por semana, mesmo reiniciando o
- * Conector várias vezes no mesmo dia.
+ * Lembretes que a agência cadastra em cada cliente na plataforma (ex.: toda
+ * segunda às 9h, perguntar os valores da promoção da semana). A plataforma
+ * manda a lista para cá (POST /agenda) e o Conector, que fica ligado o
+ * tempo todo, dispara no horário, uma vez por dia, mesmo reiniciando.
  */
-const NOME_CLIENTE_TERCA_DA_SORTE = 'Rede de Postos Margarida';
-
-function normalizarNomeSimples(s) {
-  return (s || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .trim().toLowerCase();
-}
-
-/** Data/hora atual no fuso de Brasília, sem depender do fuso do servidor onde o Conector está hospedado. */
 function agoraEmSaoPaulo() {
   const partes = Object.fromEntries(
     new Intl.DateTimeFormat('en-US', {
@@ -258,42 +282,29 @@ function agoraEmSaoPaulo() {
   return {
     data: `${partes.year}-${partes.month}-${partes.day}`,
     diaSemana: diaSemanaMap[partes.weekday],
-    hora: Number(partes.hour),
+    hora: Number(partes.hour) % 24,
   };
 }
 
-async function verificarTercaDaSorte() {
+async function verificarAgenda() {
   const { data, diaSemana, hora } = agoraEmSaoPaulo();
-  if (diaSemana !== 1 || hora < 9) return; // só segunda-feira, a partir das 9h
-  if (config.tercaDaSorteUltimoEnvio === data) return; // já perguntou essa semana
-  if (!whatsappConfigurado()) return; // WhatsApp desligado, nem tenta
-
-  const cliente = dadosCompartilhados.clients.find(
-    (c) => normalizarNomeSimples(c.name) === normalizarNomeSimples(NOME_CLIENTE_TERCA_DA_SORTE),
-  );
-  if (!cliente || !cliente.whatsappGroup) {
-    registrar('terca-da-sorte',
-      `Cliente "${NOME_CLIENTE_TERCA_DA_SORTE}" não encontrado (ou sem grupo de WhatsApp cadastrado) — pergunta semanal não enviada.`, false);
-    return;
-  }
-
-  const mensagem =
-    'Bom dia! É segunda-feira, hora de fechar a arte da Terça da Sorte de amanhã.\n\n' +
-    'Quais são os valores da promoção dessa semana?';
-  try {
-    await enviarWhatsapp(cliente.whatsappGroup, mensagem);
-    config.tercaDaSorteUltimoEnvio = data;
-    gravarConfig(config);
-    registrar('terca-da-sorte', `Pergunta semanal da Terça da Sorte enviada para ${cliente.name}.`, true);
-  } catch (e) {
-    registrar('terca-da-sorte', `Falha ao enviar a pergunta semanal: ${e.message}`, false);
+  if (!whatsappConfigurado()) return;
+  const itens = Array.isArray(config.agenda) ? config.agenda : [];
+  config.agendaEnviados ||= {};
+  for (const item of itens) {
+    if (Number(item.dia) !== diaSemana || hora < Number(item.hora)) continue;
+    if (config.agendaEnviados[item.id] === data) continue; // já foi hoje
+    if (!item.grupo || !String(item.mensagem || '').trim()) continue;
+    try {
+      await enviarWhatsapp(item.grupo, String(item.mensagem));
+      config.agendaEnviados[item.id] = data;
+      gravarConfig(config);
+      registrar('agenda', `Mensagem automática enviada para ${item.cliente || item.grupo}.`, true);
+    } catch (e) {
+      registrar('agenda', `Falha na mensagem automática para ${item.cliente || item.grupo}: ${e.message}`, false);
+    }
   }
 }
-
-// Checa a cada 5 minutos (e uma vez já na subida — cobre o Conector ligado
-// depois das 9h de segunda) se está na hora de perguntar.
-setInterval(() => { verificarTercaDaSorte().catch(() => {}); }, 5 * 60 * 1000);
-verificarTercaDaSorte().catch(() => {});
 
 /**
  * Lista os grupos de WhatsApp que a instância conectada enxerga — é o que
@@ -386,7 +397,7 @@ async function publicarInstagram(destino, legenda, mediaUrlOriginal) {
     throw new Error('a imagem precisa estar numa URL pública (o Instagram não aceita arquivo colado)');
   }
 
-  const criar = new URL(`https://graph.facebook.com/v21.0/${config.igUserId}/media`);
+  const criar = new URL(`${API_META}/${config.igUserId}/media`);
   criar.searchParams.set('access_token', config.igToken);
   criar.searchParams.set('image_url', mediaUrl);
   if (legenda) criar.searchParams.set('caption', legenda);
@@ -396,7 +407,19 @@ async function publicarInstagram(destino, legenda, mediaUrlOriginal) {
   const d1 = await r1.json();
   if (!r1.ok || !d1.id) throw new Error(`Graph API (criar): ${JSON.stringify(d1).slice(0, 200)}`);
 
-  const publicar = new URL(`https://graph.facebook.com/v21.0/${config.igUserId}/media_publish`);
+  // O Instagram processa a mídia em segundo plano; publicar antes de ficar
+  // pronta dá erro "Media ID is not available". Espera até ~60 s.
+  for (let i = 0; i < 20; i++) {
+    const st = new URL(`${API_META}/${d1.id}`);
+    st.searchParams.set('fields', 'status_code');
+    st.searchParams.set('access_token', config.igToken);
+    const ds = await (await fetch(st)).json().catch(() => ({}));
+    if (ds.status_code === 'FINISHED') break;
+    if (ds.status_code === 'ERROR' || ds.status_code === 'EXPIRED') throw new Error(`Instagram recusou a mídia (${ds.status_code}). Use JPG ou PNG em boa resolução.`);
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  const publicar = new URL(`${API_META}/${config.igUserId}/media_publish`);
   publicar.searchParams.set('access_token', config.igToken);
   publicar.searchParams.set('creation_id', d1.id);
 
@@ -409,8 +432,8 @@ async function publicarInstagram(destino, legenda, mediaUrlOriginal) {
 
 // Endereços das APIs. Variáveis de ambiente só existem para poder testar
 // o conector sem bater nas plataformas de verdade.
-const API_META = process.env.API_META || 'https://graph.facebook.com/v21.0';
-const API_GOOGLE = process.env.API_GOOGLE || 'https://googleads.googleapis.com/v18';
+const API_META = process.env.API_META || 'https://graph.facebook.com/v25.0';
+const API_GOOGLE = process.env.API_GOOGLE || 'https://googleads.googleapis.com/v25';
 const API_GOOGLE_OAUTH = process.env.API_GOOGLE_OAUTH || 'https://oauth2.googleapis.com/token';
 const API_TIKTOK = process.env.API_TIKTOK || 'https://business-api.tiktok.com/open_api/v1.3';
 const API_ZAPI = process.env.API_ZAPI || 'https://api.z-api.io';
@@ -869,7 +892,11 @@ async function receberMensagem(corpo) {
   // aqui se esse número tiver uma cobrança ativa de verdade — nunca inventa
   // valor pra quem nunca foi cobrado.
   const alvoCobranca = soDigitos(msg.grupo);
-  if (cobrancasAtivas.has(alvoCobranca)) {
+  // Com post esperando resposta nesse grupo, aprovação ou pedido de mudança
+  // ganha: "pode postar, mas muda o valor" era engolido como pergunta de
+  // cobrança por ter a palavra "valor".
+  const esperandoPost = (aguardando.get(msg.grupo) || []).length > 0 && interpretar(msg.texto) !== null;
+  if (cobrancasAtivas.has(alvoCobranca) && !esperandoPost) {
     const pergunta = perguntaSobreCobranca(msg.texto);
     if (pergunta) {
       const resposta = responderCobranca(msg.grupo, pergunta);
@@ -1055,7 +1082,15 @@ function abrirTunel() {
 
 function fecharTunel() {
   if (TUNEL_FIXO) return;
-  if (tunel.processo) tunel.processo.kill();
+  if (tunel.processo) {
+    // No Windows o túnel roda dentro de um shell: matar só o shell deixava o
+    // cloudflared vivo. taskkill /T derruba a árvore inteira.
+    if (process.platform === 'win32' && tunel.processo.pid) {
+      try { spawn('taskkill', ['/pid', String(tunel.processo.pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* segue */ }
+    } else {
+      tunel.processo.kill();
+    }
+  }
   tunel = { url: '', estado: 'parado', erro: '', processo: null };
 }
 
@@ -1095,17 +1130,24 @@ async function registrarWebhooks() {
   // Gateway de cobrança
   if (config.asaasToken) {
     try {
-      await asaas('/webhooks', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: 'Orikay',
-          url: pagamento,
-          enabled: true,
-          interrupted: false,
-          sendType: 'SEQUENTIALLY',
-          events: ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'],
-        }),
-      });
+      const dadosWebhook = {
+        name: 'Orikay',
+        url: pagamento,
+        enabled: true,
+        interrupted: false,
+        sendType: 'SEQUENTIALLY',
+        events: ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'],
+      };
+      // O endereço do túnel muda a cada abertura: atualiza o webhook "Orikay"
+      // que já existe em vez de criar mais um a cada vez (eles se acumulavam
+      // apontando para túneis mortos).
+      const lista = await asaas('/webhooks').catch(() => null);
+      const existente = (lista?.data || []).find((w) => w.name === 'Orikay');
+      if (existente?.id) {
+        await asaas(`/webhooks/${existente.id}`, { method: 'PUT', body: JSON.stringify(dadosWebhook) });
+      } else {
+        await asaas('/webhooks', { method: 'POST', body: JSON.stringify(dadosWebhook) });
+      }
       feitos.push('Asaas');
     } catch (e) {
       // O Asaas recusa webhook repetido; isso não é falha de verdade.
@@ -1204,10 +1246,41 @@ async function processar(evento) {
 
 /* ------------------------------- Servidor ----------------------------- */
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+/**
+ * Quem pode chamar o Conector pelo navegador: a plataforma (site, app
+ * desktop, ambiente de desenvolvimento) e a própria tela do Conector.
+ * Antes era `*`: qualquer site aberto neste computador conseguia ler as
+ * chaves de WhatsApp, Meta e Asaas em /estado, ou disparar mensagens.
+ */
+const ORIGENS_PLATAFORMA = [
+  /^https:\/\/(www\.)?orikay\.com\.br$/i,
+  /^https:\/\/metanoide-ic\.github\.io$/i,
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i,
+  /^null$/, // app desktop (file://)
+  ...String(process.env.ORIGENS_EXTRAS || '').split(',').map((o) => o.trim()).filter(Boolean)
+    .map((o) => new RegExp(`^${o.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')),
+];
+
+/** Rotas de administração: só a tela do próprio Conector usa. */
+const ROTAS_DA_TELA = new Set(['/estado', '/config', '/tunel', '/testar']);
+
+function origemDaTela(origem) {
+  if (!origem) return false;
+  if (new RegExp(`^https?://(localhost|127\\.0\\.0\\.1):${PORT}$`, 'i').test(origem)) return true;
+  try {
+    const publicas = [TUNEL_FIXO, tunel.url].filter(Boolean).map((u) => new URL(u).origin);
+    return publicas.includes(origem);
+  } catch { return false; }
+}
+
+function cors(req, res) {
+  const origem = req.headers.origin;
+  if (origem && (origemDaTela(origem) || ORIGENS_PLATAFORMA.some((r) => r.test(origem)))) {
+    res.setHeader('Access-Control-Allow-Origin', origem);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
 }
 
 // O estado compartilhado da equipe (posts, vídeos etc.) carrega as imagens
@@ -1219,25 +1292,55 @@ function cors(res) {
 // a memória do processo crescer sem controle com uma requisição absurda.
 function corpo(req) {
   return new Promise((resolve) => {
-    let dados = '';
+    // Junta os pedaços como bytes e só decodifica no fim: somar texto pedaço
+    // a pedaço quebrava "ç", "ã", "é" que caíam na divisa entre dois pedaços.
+    const partes = [];
+    let tamanho = 0;
     let estourou = false;
     req.on('data', (p) => {
       if (estourou) return;
-      dados += p;
-      if (dados.length > 40e6) { estourou = true; req.destroy(); }
+      tamanho += p.length;
+      if (tamanho > 40e6) { estourou = true; return; }
+      partes.push(p);
     });
     req.on('end', () => {
       if (estourou) { resolve({}); return; } // mesmo padrão de "corpo malformado" abaixo — nunca null
-      try { resolve(JSON.parse(dados || '{}')); } catch { resolve({}); }
+      try { resolve(JSON.parse(Buffer.concat(partes).toString('utf8') || '{}')); } catch { resolve({}); }
     });
+    req.on('error', () => resolve({}));
   });
 }
 
 const servidor = createServer(async (req, res) => {
-  cors(res);
+  // Qualquer erro inesperado responde 500 em vez de derrubar o Conector
+  // inteiro (antes, um arquivo travado pelo OneDrive fechava o programa).
+  try {
+    await atender(req, res);
+  } catch (e) {
+    registrar('erro', `falha ao atender ${req.method} ${req.url?.split('?')[0]}: ${e.message}`, false);
+    if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json' });
+    try { res.end(JSON.stringify({ ok: false, erro: 'erro interno do Conector' })); } catch { /* conexão já fechou */ }
+  }
+});
+
+async function atender(req, res) {
+  cors(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
+
+  // Navegador de outro site: recusa antes de qualquer coisa. Serviços
+  // externos (Z-API, Asaas, Instagram) não mandam Origin e seguem adiante.
+  const origem = req.headers.origin;
+  const daTela = origemDaTela(origem);
+  if (origem && !daTela && !ORIGENS_PLATAFORMA.some((r) => r.test(origem))) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, erro: 'origem não autorizada' }));
+  }
+  if (origem && !daTela && ROTAS_DA_TELA.has(url.pathname)) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, erro: 'rota disponível só na tela do Conector' }));
+  }
 
   // /entrada e /entrada-pagamento têm o próprio token (endereço fixo dado
   // aos serviços externos) e continuam liberados aqui — sem eles a Z-API e
@@ -1251,8 +1354,12 @@ const servidor = createServer(async (req, res) => {
   // descobrisse o endereço do túnel leria (e mudaria) os dados da equipe
   // inteira: clientes, financeiro, tudo. Na própria máquina (localhost)
   // continua livre, como sempre foi.
-  const hostLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(req.headers.host || '');
-  if ((EXIGIR_TOKEN || !hostLocal) && !rotaComTokenProprio && url.searchParams.get('token') !== config.entradaToken) {
+  // "Local" de verdade: o cabeçalho Host qualquer um forja; o endereço de
+  // quem conectou, não. O túnel conecta daqui mesmo, mas manda o Host
+  // público, então pedido vindo pelo túnel continua exigindo o token.
+  const ipLocal = /^(::1|127\.\d+\.\d+\.\d+|::ffff:127\.\d+\.\d+\.\d+)$/.test(req.socket.remoteAddress || '');
+  const hostLocal = ipLocal && /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(req.headers.host || '');
+  if ((EXIGIR_TOKEN || !hostLocal) && !rotaComTokenProprio && !segredoIgual(url.searchParams.get('token'), config.entradaToken)) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: false, erro: 'token inválido ou ausente — confira o endereço colado na Orikay' }));
   }
@@ -1379,9 +1486,30 @@ const servidor = createServer(async (req, res) => {
   }
 
   // A plataforma busca aqui as respostas já entendidas.
+  // Mensagens automáticas semanais que a agência cadastrou nos clientes.
+  if (url.pathname === '/agenda' && req.method === 'POST') {
+    const { itens } = await corpo(req);
+    const lista = (Array.isArray(itens) ? itens : []).slice(0, 200).map((i) => ({
+      id: String(i.id || '').slice(0, 80),
+      grupo: String(i.grupo || '').slice(0, 120),
+      cliente: String(i.cliente || '').slice(0, 120),
+      dia: Math.min(6, Math.max(0, Number(i.dia) || 0)),
+      hora: Math.min(23, Math.max(0, Number(i.hora) || 0)),
+      mensagem: String(i.mensagem || '').slice(0, 2000),
+    })).filter((i) => i.id && i.grupo && i.mensagem.trim());
+    config.agenda = lista;
+    gravarConfig(config);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, itens: lista.length }));
+  }
+
   if (url.pathname === '/decisoes') {
-    const pendentes = decisoes;
-    decisoes = [];
+    // ?pagamentos=0: quem pergunta não enxerga cobranças (não tem acesso ao
+    // Financeiro). Os avisos de pagamento ficam na fila para quem tem, em
+    // vez de serem retirados e perdidos.
+    const semPagamentos = url.searchParams.get('pagamentos') === '0';
+    const pendentes = semPagamentos ? decisoes.filter((d) => d.tipo !== 'pagamento') : decisoes;
+    decisoes = semPagamentos ? decisoes.filter((d) => d.tipo === 'pagamento') : [];
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, decisoes: pendentes }));
   }
@@ -1455,9 +1583,12 @@ const servidor = createServer(async (req, res) => {
   // não aparecem numa aba já aberta mesmo depois de reiniciar o conector.
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(PAGINA);
-});
+}
 
-servidor.listen(PORT, () => {
+// Só nesta máquina: os outros aparelhos chegam pelo túnel. Hospedado num
+// servidor (EXIGIR_TOKEN=1), escuta em todas as interfaces, atrás do token.
+const ENDERECO = process.env.HOST || (EXIGIR_TOKEN ? '0.0.0.0' : '127.0.0.1');
+servidor.listen(PORT, ENDERECO, () => {
   const sufixo = EXIGIR_TOKEN ? `?token=${config.entradaToken}` : '';
   console.log('');
   console.log('  Conector Orikay em execução.');
@@ -1478,10 +1609,13 @@ servidor.listen(PORT, () => {
   console.log('  Deixe esta janela aberta enquanto usar a plataforma.');
   console.log('');
   if (config.tunelAutomatico) abrirTunel();
+  // Mensagens automáticas: confere a cada 5 minutos (e já na subida).
+  setInterval(() => { verificarAgenda().catch(() => {}); }, 5 * 60 * 1000);
+  verificarAgenda().catch(() => {});
 });
 
 for (const sinal of ['SIGINT', 'SIGTERM']) {
-  process.on(sinal, () => { fecharTunel(); process.exit(0); });
+  process.on(sinal, () => { gravarDadosAgora(); fecharTunel(); process.exit(0); });
 }
 
 /* --------------------------- Tela de configuração --------------------- */

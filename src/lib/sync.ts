@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { useData, type RemoteSyncData } from './dataStore';
 import { useSettings } from './settingsStore';
 import { connectorPath } from './inbox';
+import { NUVEM } from './nuvem/cliente';
 
 interface SyncStatus {
   sincronizando: boolean;
@@ -28,6 +29,9 @@ export const useSyncStatus = create<SyncStatus>(() => ({
  * (como sempre foi).
  */
 async function sincronizarAgora(): Promise<boolean> {
+  // Com a nuvem ligada, os dados sincronizam por ela; o Conector fica só
+  // com WhatsApp, Instagram e anúncios.
+  if (NUVEM) return true;
   const { connectorUrl } = useSettings.getState();
   if (!connectorUrl) return false;
 
@@ -68,6 +72,7 @@ async function sincronizarAgora(): Promise<boolean> {
  * funcionar pra todo mundo.
  */
 async function reconciliarChaveIA(): Promise<void> {
+  if (NUVEM) return; // a chave da IA viaja nos ajustes da agência
   const s = useSettings.getState();
   if (!s.connectorUrl) return;
   try {

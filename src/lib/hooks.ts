@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useData } from './dataStore';
 import type { Client } from './types';
+import { isoLocal } from './utils';
 
 export function useClientMap(): Record<string, Client> {
   const clients = useData((s) => s.clients);
@@ -15,5 +16,5 @@ export function monthKey(iso: string): string {
 }
 
 export function isSameMonth(iso: string, ref = new Date()): boolean {
-  return iso.slice(0, 7) === ref.toISOString().slice(0, 7);
+  return iso.slice(0, 7) === isoLocal(ref).slice(0, 7);
 }

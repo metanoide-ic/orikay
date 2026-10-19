@@ -48,6 +48,7 @@ export default defineConfig({
           charts: ['recharts'],
           motion: ['framer-motion'],
           dnd: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+          nuvem: ['@supabase/supabase-js'],
         },
       },
     },

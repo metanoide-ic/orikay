@@ -1,5 +1,6 @@
 import type { Post, Client } from './types';
 import { useSettings } from './settingsStore';
+import { daAgencia, nomeDaAgencia } from './agencia';
 
 const HOOKS = [
   'Para sua marca,',
@@ -39,7 +40,7 @@ export function templateCopy(post: Post, client?: Client): string {
 
   return (
     `${hook} ${tema}${marca} é sobre transformar ideia em resultado.\n\n` +
-    `Na Origem, a gente une estratégia, criatividade e execução pra sua marca ` +
+    `Na ${nomeDaAgencia()}, a gente une estratégia, criatividade e execução pra sua marca ` +
     `aparecer do jeito certo, pra pessoa certa, na hora certa.\n\n` +
     `${cta}\n\n${hashados(post.platform)}`
   );
@@ -47,10 +48,10 @@ export function templateCopy(post: Post, client?: Client): string {
 
 function buildPrompt(post: Post, client?: Client, brandVoice?: string): string {
   return (
-    `Você é redator publicitário da agência Origem. Escreva a LEGENDA (copy) de um post.\n` +
+    `Você é redator publicitário ${daAgencia()}. Escreva a LEGENDA (copy) de um post.\n` +
     `Tom de voz da marca: ${brandVoice || 'moderno, direto e confiante'}.\n` +
     `Plataforma: ${post.platform}.\n` +
-    `Cliente: ${client?.name || 'Origem'}.\n` +
+    `Cliente: ${client?.name || nomeDaAgencia()}.\n` +
     `Tema do post: ${post.title}.\n` +
     (post.notes ? `Observações: ${post.notes}.\n` : '') +
     `Regras: português do Brasil, gancho forte na 1ª linha, SEM emojis, ` +
@@ -111,7 +112,7 @@ export async function generatePlanIdeas(
       .filter((t, i, arr) => t && arr.indexOf(t) === i)
       .slice(0, 20);
     const prompt =
-      `Você é redator e estrategista de conteúdo da agência Origem, planejando o mês do cliente "${client.name}".\n` +
+      `Você é redator e estrategista de conteúdo ${daAgencia()}, planejando o mês do cliente "${client.name}".\n` +
       (client.briefing ? `Sobre o cliente (use só o que está aqui, não invente fatos novos sobre o negócio): ${client.briefing}\n` : '') +
       (client.cities?.length ? `Cidades onde atende: ${client.cities.join(', ')}.\n` : '') +
       (evitar.length ? `Já foram usados esses temas recentemente, NÃO repita o mesmo ângulo: ${evitar.join(' | ')}\n` : '') +
@@ -180,9 +181,9 @@ export async function generateVideoScript(video: { title: string; notes?: string
   if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) return templateRoteiro(video.title, client);
   try {
     const prompt =
-      `Você é roteirista de vídeos curtos (Reels/TikTok) da agência Origem. Escreva o ROTEIRO de um vídeo.\n` +
+      `Você é roteirista de vídeos curtos (Reels/TikTok) ${daAgencia()}. Escreva o ROTEIRO de um vídeo.\n` +
       `Tom de voz da marca: ${s.brandVoice || 'moderno, direto e confiante'}.\n` +
-      `Cliente: ${client?.name || 'Origem'}.\n` +
+      `Cliente: ${client?.name || nomeDaAgencia()}.\n` +
       (client?.briefing ? `Sobre o cliente (use só o que está aqui, não invente fatos): ${client.briefing}\n` : '') +
       `Tema do vídeo: ${video.title}.\n` +
       (video.notes ? `Anotações já existentes: ${video.notes}\n` : '') +
@@ -283,8 +284,14 @@ export async function generateCopy(post: Post, client?: Client): Promise<string>
     if (!text) throw new Error('Resposta vazia da IA');
     return text.trim();
   } catch (e) {
-    // Fallback garantido: nunca deixa o usuário sem copy.
-    return templateCopy(post, client) + `\n\n— (gerado localmente; IA indisponível: ${(e as Error).message})`;
+    // Fallback garantido: nunca deixa o usuário sem copy. E nunca põe
+    // mensagem de erro dentro da legenda, que vai pro grupo do cliente: o
+    // aviso fica no log de Automações.
+    void import('./dataStore').then(({ useData }) => useData.getState().addEvent({
+      channel: 'ia', title: 'IA indisponível: legenda gerada pelo modelo local', status: 'erro',
+      detail: `${(e as Error).message}. Confira a chave em Integrações → IA para copies.`, postId: post.id,
+    }));
+    return templateCopy(post, client);
   }
 }
 
@@ -325,7 +332,7 @@ export interface AiChatMessage {
 export async function chatStep(messages: AiChatMessage[], tools: AiTool[]): Promise<AiChatMessage> {
   const s = useSettings.getState();
   if (s.aiMode !== 'api' || !s.aiKey || !s.aiEndpoint) {
-    throw new Error('Configure uma chave de IA em Ajustes (com suporte a function calling) pra usar a IA Helper.');
+    throw new Error('Configure uma chave de IA em Integrações → IA para copies (com suporte a function calling) pra usar a IA Helper.');
   }
   const res = await fetch(s.aiEndpoint, {
     method: 'POST',

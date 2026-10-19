@@ -3,10 +3,11 @@ import { Sparkles, Send, Loader2, Check, X, ShieldAlert, Trash2 } from 'lucide-r
 import { Modal, Button } from '@/components/ui';
 import { useAuth } from '@/lib/authStore';
 import { chatStep, type AiChatMessage } from '@/lib/ai';
-import { allToolSchemas, findTool } from '@/lib/aiTools';
+import { allToolSchemas, descreverAcao, findTool } from '@/lib/aiTools';
 import { cn } from '@/lib/utils';
+import { daAgencia } from '@/lib/agencia';
 
-const SISTEMA = `Você é a IA Helper da Orikay, a plataforma interna da agência Origem Comunicação & Marketing.
+const sistema = () => `Você é a IA Helper do Orikay, a plataforma ${daAgencia()}.
 Você tem ferramentas de verdade pra ler e mexer na plataforma: posts, vídeos, clientes, cobranças e mensagens do WhatsApp (via Conector).
 Regras:
 - Fale português do Brasil, direto e sem enrolação.
@@ -41,8 +42,12 @@ export function AIHelper() {
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [busy, setBusy] = useState(false);
   const [pendente, setPendente] = useState<{ call: ToolCall; args: Record<string, unknown> } | null>(null);
-  const historico = useRef<AiChatMessage[]>([{ role: 'system', content: SISTEMA }]);
+  const historico = useRef<AiChatMessage[]>([{ role: 'system', content: sistema() }]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Continuação de um lote de tool_calls de UMA resposta da IA — guardado
+  // fora do estado (não precisa re-render) pra retomar do ponto certo
+  // depois que uma ferramenta sensível pausa esperando confirmação.
+  const lote = useRef<{ calls: ToolCall[]; idx: number; rodada: number } | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -51,18 +56,13 @@ export function AIHelper() {
   if (!logado) return null;
 
   function reset() {
-    historico.current = [{ role: 'system', content: SISTEMA }];
+    historico.current = [{ role: 'system', content: sistema() }];
     lote.current = null;
     setLinhas([]);
     setInput('');
     setPendente(null);
     setBusy(false);
   }
-
-  // Continuação de um lote de tool_calls de UMA resposta da IA — guardado
-  // fora do estado (não precisa re-render) pra retomar do ponto certo
-  // depois que uma ferramenta sensível pausa esperando confirmação.
-  const lote = useRef<{ calls: ToolCall[]; idx: number; rodada: number } | null>(null);
 
   async function processarLote(): Promise<void> {
     const atual = lote.current;
@@ -238,13 +238,7 @@ function LinhaChat({ linha }: { linha: Linha }) {
 }
 
 function ConfirmacaoCard({ call, args, onConfirmar }: { call: ToolCall; args: Record<string, unknown>; onConfirmar: (ok: boolean) => void }) {
-  const nome = call.function.name;
-  const descricao =
-    nome === 'enviar_mensagem_whatsapp'
-      ? `Mandar essa mensagem pra: ${(args.clientesIdsOuNomes as string[] | undefined)?.join(', ') ?? '—'}\n\n"${args.mensagem}"`
-      : nome === 'excluir_item'
-        ? `Excluir ${args.tipo} definitivamente (id ${args.id}). Isso não pode ser desfeito.`
-        : JSON.stringify(args);
+  const descricao = descreverAcao(call.function.name, args);
 
   return (
     <div className="rounded-2xl border border-amber-400/30 bg-amber-500/[0.06] p-4">

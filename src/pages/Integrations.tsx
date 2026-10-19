@@ -9,6 +9,8 @@ import { requestNotifyPermission } from '@/lib/notifications';
 import { buscarGruposDoConector, autoMatchGroups } from '@/lib/groupMatch';
 import { useSyncStatus } from '@/lib/sync';
 import { cn } from '@/lib/utils';
+import { NUVEM } from '@/lib/nuvem/cliente';
+import { definirPermissoes } from '@/lib/nuvem/sessao';
 
 function Section({ icon, title, desc, children, tint }: { icon: React.ReactNode; title: string; desc?: string; children: React.ReactNode; tint: string }) {
   return (
@@ -58,7 +60,14 @@ export default function Integrations() {
   const s = useSettings();
   const user = useAuth((x) => x.current());
   const accounts = useAuth((x) => x.accounts);
-  const setPermission = useAuth((x) => x.setPermission);
+  const setPermissionLocal = useAuth((x) => x.setPermission);
+  // Na nuvem, permissão é gravada no banco (e vale em todos os aparelhos).
+  const setPermission = (id: string, patch: { canFinance?: boolean; admin?: boolean }) => {
+    if (!NUVEM) return setPermissionLocal(id, patch);
+    const atual = accounts.find((a) => a.id === id);
+    if (!atual) return;
+    void definirPermissoes(id, { admin: patch.admin ?? atual.admin, financeiro: patch.canFinance ?? atual.canFinance });
+  };
   const clients = useData((x) => x.clients);
   const [saved, setSaved] = useState(false);
   const [notifMsg, setNotifMsg] = useState('');
@@ -113,9 +122,9 @@ export default function Integrations() {
                 <Field label="Modelo"><Input value={s.aiModel} onChange={(e) => s.update({ aiModel: e.target.value })} placeholder="gpt-4o" /></Field>
               </div>
               <Note>
-                A chave vale pra equipe toda: com o Conector configurado, ela se guarda nele e se
-                espalha sozinha pros outros navegadores — cola uma vez, em qualquer dispositivo.
-                Sem Conector, fica salva só neste navegador.
+                {NUVEM
+                  ? 'A chave vale para a agência inteira: cola uma vez, em qualquer aparelho, e a IA passa a funcionar para toda a equipe.'
+                  : 'A chave vale pra equipe toda: com o Conector configurado, ela se guarda nele e se espalha sozinha pros outros navegadores. Sem Conector, fica salva só neste navegador.'}
               </Note>
             </>
           )}
@@ -191,8 +200,8 @@ export default function Integrations() {
             <Input value={s.connectorUrl} onChange={(e) => s.update({ connectorUrl: e.target.value })} placeholder="http://localhost:8787/webhook" />
           </Field>
           <Note>
-            Cole o mesmo endereço nos campos de WhatsApp e de publicação abaixo. Este
-            campo é o que permite trazer os números das campanhas de tráfego.
+            Não precisa colar em mais nenhum lugar: com o Conector ligado, WhatsApp, publicação,
+            cobrança e os números das campanhas de tráfego já usam este endereço.
           </Note>
           {s.connectorUrl && <SyncStatusIndicator />}
         </Section>
@@ -215,7 +224,7 @@ export default function Integrations() {
           <Note>
             Com isso ligado, ao abrir a plataforma (em qualquer tela) ela gera as
             cobranças do mês e manda no WhatsApp quem já venceu — uma vez por dia,
-            só quem tiver o Conector ou o webhook do WhatsApp configurado abaixo.
+            só quem tiver o Conector ou o webhook do WhatsApp configurado.
             Sem canal de envio configurado, as cobranças ficam prontas mas não saem
             sozinhas, para nunca marcar como enviada uma cobrança que não saiu de
             verdade. Confirmação automática de pagamento exige o gateway (Asaas):

@@ -181,6 +181,9 @@ export default function Posts() {
     if (e.button !== 0) return; // só botão esquerdo
     const target = e.target as HTMLElement;
     if (target.closest('[data-post-id], [data-col-handle], button, textarea, input, select, a')) return;
+    // Dentro de modal, menu lateral ou painel flutuante (IA) não é o quadro:
+    // arrastar ali selecionava cartões escondidos atrás.
+    if (target.closest('[role="dialog"], .fixed, aside, header')) return;
     const additive = e.shiftKey || e.ctrlKey || e.metaKey;
     const x1 = e.clientX;
     let y1 = e.clientY;
@@ -303,7 +306,7 @@ export default function Posts() {
         icon: <Archive size={15} />,
         onSelect: () => { updatePost(post.id, { archived: true }); avisar('Cartão arquivado.'); },
       },
-      { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => removePost(post.id) },
+      { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => { if (confirm(`Excluir o post "${post.title}"? Não dá para desfazer. Para tirar do quadro sem perder, use Arquivar.`)) removePost(post.id); } },
     ];
   }
 

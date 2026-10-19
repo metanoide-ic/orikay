@@ -98,17 +98,22 @@ export function postSpendToFinance(campaignId: string): void {
   const c = store.campaigns.find((x) => x.id === campaignId);
   if (!c || !c.metrics.spend) return;
   const client = store.clients.find((x) => x.id === c.clientId);
+  // Só a diferença: a campanha segue gastando depois do primeiro lançamento,
+  // e antes não dava para lançar de novo.
+  const jaLancado = c.spendLancado ?? (c.postedToFinance ? c.metrics.spend : 0);
+  const valor = Math.round((c.metrics.spend - jaLancado) * 100) / 100;
+  if (valor <= 0) return;
 
   store.addTx({
     type: 'despesa',
-    description: `Tráfego pago: ${c.name}${client ? ` (${client.name})` : ''}`,
-    amount: c.metrics.spend,
+    description: `Tráfego pago: ${c.name}${client ? ` (${client.name})` : ''}${jaLancado ? ' (complemento)' : ''}`,
+    amount: valor,
     category: 'Mídia',
     clientId: c.clientId,
     date: todayISO(),
     status: 'pago',
   });
-  store.updateCampaign(campaignId, { postedToFinance: true });
+  store.updateCampaign(campaignId, { postedToFinance: true, spendLancado: c.metrics.spend });
   store.addEvent({
     channel: 'sistema',
     title: `Investimento lançado no caixa: ${c.name}`,

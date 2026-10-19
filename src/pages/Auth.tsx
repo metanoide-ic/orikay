@@ -8,9 +8,9 @@ import { useAuth } from '@/lib/authStore';
 import { useData } from '@/lib/dataStore';
 
 /**
- * Tela de entrada — só login. A plataforma é interna da equipe Origem: não
- * existe "criar conta" público de propósito; conta nova é o admin que cria
- * em Equipe.
+ * Tela de entrada do modo local (sem nuvem): login, ou criar a primeira
+ * conta quando o aparelho ainda não tem nenhuma. Conta nova depois disso é
+ * o admin que cria em Equipe.
  */
 export default function Auth() {
   const [identifier, setIdentifier] = useState('');
@@ -19,7 +19,10 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
 
   const login = useAuth((s) => s.login);
+  const signup = useAuth((s) => s.signup);
   const ensureTeam = useAuth((s) => s.ensureTeam);
+  // Aparelho sem nenhuma conta: a primeira pessoa cria a dela (e administra).
+  const semContas = useAuth((s) => s.accounts.length === 0);
   const data = useData();
   const navigate = useNavigate();
 
@@ -34,7 +37,7 @@ export default function Auth() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res = login(identifier, password);
+    const res = semContas ? signup({ name: identifier, password }) : login(identifier, password);
 
     setTimeout(() => {
       setLoading(false);
@@ -65,7 +68,7 @@ export default function Auth() {
               continue de onde parou.
             </p>
           </div>
-          <p className="text-xs tracking-wide text-white/35">Orikay · Origem Comunicação &amp; Marketing</p>
+          <p className="text-xs tracking-wide text-white/35">Orikay</p>
         </div>
       </div>
 
@@ -77,12 +80,12 @@ export default function Auth() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
           <div className="mb-8 lg:hidden"><Logo /></div>
 
-          <h1 className="text-2xl font-semibold text-white">Entrar</h1>
-          <p className="mt-1.5 text-sm text-white/50">Use seu login e senha da equipe.</p>
+          <h1 className="text-2xl font-semibold text-white">{semContas ? 'Criar a primeira conta' : 'Entrar'}</h1>
+          <p className="mt-1.5 text-sm text-white/50">{semContas ? 'Você administra a agência neste aparelho.' : 'Use seu login e senha da equipe.'}</p>
 
           <form onSubmit={submit} className="mt-7 space-y-4">
             <Field label="Login">
-              <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Ex.: João Paulo" autoFocus autoComplete="username" />
+              <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Ex.: Marina Couto" autoFocus autoComplete="username" />
             </Field>
             <Field label="Senha">
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
@@ -94,13 +97,15 @@ export default function Auth() {
 
             <Button type="submit" size="lg" className="w-full" disabled={loading}>
               {loading && <Loader2 size={18} className="animate-spin" />}
-              Entrar
+              {semContas ? 'Criar conta' : 'Entrar'}
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-white/40">
-            Conta nova? Peça a um admin pra criar em Equipe.
-          </p>
+          {!semContas && (
+            <p className="mt-6 text-center text-sm text-white/40">
+              Conta nova? Peça a um admin pra criar em Equipe.
+            </p>
+          )}
         </motion.div>
       </div>
     </div>

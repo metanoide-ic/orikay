@@ -39,13 +39,33 @@ export interface Settings {
   postStageOrder: string[];
   /** Ordem das colunas de Vídeos. Vazio = usa a ordem padrão (VIDEO_STAGE_ORDER). */
   videoStageOrder: string[];
+
+  // --- Financeiro ---
+  /** Despesas fixas da agência (folha, aluguel...), lançadas como pendentes todo mês. */
+  despesasFixas: DespesaFixa[];
+  /**
+   * Cobranças e despesas fixas geradas automaticamente que alguém apagou de
+   * propósito (ids). O gerador do mês pula esses, em vez de recriar.
+   */
+  geracaoIgnorada: string[];
+  /** A lista de despesas fixas já foi montada (a partir do histórico) uma vez. */
+  despesasFixasIniciadas: boolean;
+}
+
+export interface DespesaFixa {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  /** Dia do vencimento no mês. */
+  day: number;
 }
 
 interface SettingsState extends Settings {
   update: (patch: Partial<Settings>) => void;
 }
 
-const defaults: Settings = {
+export const defaults: Settings = {
   // IA externa (OpenAI) é o padrão da plataforma — a chave em si não fica
   // aqui (código público!): ela mora no Conector e cada navegador puxa
   // sozinho na sincronização. Sem chave nenhuma, tudo continua funcionando
@@ -69,6 +89,9 @@ const defaults: Settings = {
   lastAutoBillingRun: '',
   postStageOrder: [],
   videoStageOrder: [],
+  despesasFixas: [],
+  geracaoIgnorada: [],
+  despesasFixasIniciadas: false,
 };
 
 export const useSettings = create<SettingsState>()(

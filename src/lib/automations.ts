@@ -2,23 +2,35 @@ import { useData } from './dataStore';
 import { useSettings } from './settingsStore';
 import { generateCopy } from './ai';
 import type { EventChannel, EventStatus, Post } from './types';
+import { coverOf } from './utils';
 
 function log(channel: EventChannel, title: string, status: EventStatus, detail?: string, postId?: string) {
   useData.getState().addEvent({ channel, title, status, detail, postId });
 }
 
-/** Dispara um webhook (fire-and-forget). Retorna se foi entregue de fato. */
+/**
+ * Dispara um webhook e diz se deu certo de verdade.
+ *
+ * Primeiro tenta uma chamada normal, que deixa ler a resposta: o Conector
+ * responde `{ ok: false, erro }` quando o WhatsApp ou o Instagram recusam, e
+ * isso tem que aparecer como erro (antes, com `no-cors`, tudo virava "ok").
+ * Só se o destino não aceitar CORS (Make, n8n...) cai no envio cego, e aí o
+ * resultado é "entregue, sem confirmação".
+ */
 export async function fireWebhook(url: string, payload: unknown): Promise<boolean> {
+  const corpo = JSON.stringify(payload);
   try {
-    await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors', // entrega cross-origin sem exigir CORS do destino
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return true;
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: corpo });
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    return data && typeof data === 'object' && 'ok' in data ? Boolean((data as { ok: unknown }).ok) : true;
   } catch {
-    return false;
+    try {
+      await fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: corpo });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -37,8 +49,13 @@ export async function sendForApproval(postId: string): Promise<void> {
   if (!post) return;
   const client = clientOf(post);
 
-  log('ia', `Gerando copy para "${post.title}"…`, 'ok', undefined, postId);
-  const copy = await generateCopy(post, client);
+  // Copy que a equipe já escreveu é a que vai pro cliente. Só gera quando
+  // o post chega em Aprovação sem legenda nenhuma.
+  let copy = post.copy?.trim() ?? '';
+  if (!copy) {
+    log('ia', `Gerando copy para "${post.title}"…`, 'ok', undefined, postId);
+    copy = await generateCopy(post, client);
+  }
   store.updatePost(postId, { copy, sentForApproval: true });
 
   const message =
@@ -59,7 +76,7 @@ export async function sendForApproval(postId: string): Promise<void> {
     instagram: client?.instagram || null,
     mensagem: message,
     copy,
-    mediaUrl: post.mediaUrl || null,
+    mediaUrl: coverOf(post) || null,
   };
 
   // O Conector entende o mesmo evento que o webhook antigo (Make/n8n) —
@@ -87,6 +104,8 @@ export async function publishPost(postId: string): Promise<void> {
   const client = clientOf(post);
   const caption = post.copy || post.caption || post.title;
 
+  let algumOk = false;
+  let tentou = false;
   for (const destino of ['feed', 'story'] as const) {
     const payload = {
       tipo: 'publicar',
@@ -96,12 +115,14 @@ export async function publishPost(postId: string): Promise<void> {
       cliente: client?.name || null,
       instagram: client?.instagram || null,
       legenda: caption,
-      mediaUrl: post.mediaUrl || null,
+      mediaUrl: coverOf(post) || null,
     };
     // Mesmo caso do WhatsApp: o Conector também publica (tipo 'publicar').
     const canalPublicacao = s.publishWebhook || s.connectorUrl;
     if (canalPublicacao) {
+      tentou = true;
       const ok = await fireWebhook(canalPublicacao, payload);
+      algumOk ||= ok;
       log('instagram', `Publicado no ${destino}: "${post.title}"`, ok ? 'ok' : 'erro',
         ok ? `Enviado ao webhook de publicação (${destino}).` : 'Falha no webhook de publicação.', postId);
     } else {
@@ -110,7 +131,9 @@ export async function publishPost(postId: string): Promise<void> {
     }
   }
 
-  store.updatePost(postId, { published: true, stage: 'publicado' });
+  // Só vira "publicado" se saiu de verdade (ou se é simulação, sem canal).
+  if (algumOk || !tentou) store.updatePost(postId, { published: true, stage: 'publicado' });
+  else log('instagram', `Não publicou "${post.title}"`, 'erro', 'O post continua em Aprovação. Confira o Conector e tente "Aprovado, publicar" de novo.', postId);
 }
 
 /**

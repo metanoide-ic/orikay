@@ -15,6 +15,7 @@ import {
 } from '@/lib/adsPlaybook';
 import { money, todayISO } from '@/lib/utils';
 import type { AdPlatform, Campaign, CampaignFunnel, CampaignObjective, CampaignStatus, ServiceArea } from '@/lib/types';
+import { parseBRL } from '@/lib/utils';
 
 const PLATFORMS: AdPlatform[] = ['Meta', 'Google', 'TikTok'];
 const OBJECTIVES: CampaignObjective[] = ['Reconhecimento', 'Tráfego', 'Engajamento', 'Mensagens', 'Leads', 'Vendas'];
@@ -33,7 +34,7 @@ const blank = {
   geoMode: 'cidade' as ServiceArea, geoPlaces: '', geoRadiusKm: '',
 };
 
-const num = (v: string) => (v ? parseFloat(v.replace(',', '.')) : undefined);
+const num = (v: string) => parseBRL(v);
 const int = (n: number) => new Intl.NumberFormat('pt-BR').format(Math.round(n));
 
 export default function Traffic() {
@@ -237,14 +238,14 @@ export default function Traffic() {
                       <td className="px-3 py-3.5 text-right tabular-nums text-white/70">{d.ctr ? `${d.ctr.toFixed(2)}%` : '—'}</td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-1.5">
-                          {canFinance && c.metrics.spend > 0 && !c.postedToFinance && (
+                          {canFinance && c.metrics.spend > (c.spendLancado ?? (c.postedToFinance ? c.metrics.spend : 0)) && (
                             <Button size="sm" variant="soft" onClick={() => postSpendToFinance(c.id)}>
                               <ArrowDownToLine size={14} /> Lançar no caixa
                             </Button>
                           )}
-                          {c.postedToFinance && <span className="text-[11px] text-white/35">no caixa</span>}
+                          {c.postedToFinance && c.metrics.spend <= (c.spendLancado ?? c.metrics.spend) && <span className="text-[11px] text-white/35">no caixa</span>}
                           <button onClick={() => openEdit(c)} className="grid h-8 w-8 place-items-center rounded-lg text-white/45 transition hover:bg-white/5 hover:text-white"><Pencil size={15} /></button>
-                          <button onClick={() => removeCampaign(c.id)} className="grid h-8 w-8 place-items-center rounded-lg text-white/45 transition hover:bg-red-500/10 hover:text-red-300"><Trash2 size={15} /></button>
+                          <button onClick={() => { if (confirm(`Apagar a campanha "${c.name}"?`)) removeCampaign(c.id); }} aria-label="Apagar campanha" className="grid h-8 w-8 place-items-center rounded-lg text-white/45 transition hover:bg-red-500/10 hover:text-red-300"><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </tr>

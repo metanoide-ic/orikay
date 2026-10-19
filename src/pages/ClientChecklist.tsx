@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ClipboardCheck, Plus, Search, Trash2, X, Settings2, History, Users, Camera,
+  ClipboardCheck, Plus, Search, Trash2, X, Settings2, History, Camera, RotateCcw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Input, Modal, Field, Badge, Stat, EmptyState, Avatar, comprimirImagem } from '@/components/ui';
@@ -39,7 +39,7 @@ function bySection(items: OnboardingChecklistItem[]) {
 
 export default function ClientChecklist() {
   const {
-    clients, addClient, updateClient, removeClient, events, ensureOnboardingChecklists,
+    clients, addClient, updateClient, events, ensureOnboardingChecklists,
     toggleOnboardingItem, addOnboardingItem, editOnboardingItem, removeOnboardingItem,
   } = useData();
   useEffect(() => { ensureOnboardingChecklists(); }, [ensureOnboardingChecklists]);
@@ -84,17 +84,13 @@ export default function ClientChecklist() {
     setNewOpen(false);
   }
 
-  function excluirCliente(c: Client) {
-    if (!confirm(`Excluir a checklist de "${c.name}"? O cadastro do cliente não é afetado se ele existir em outras telas — isso remove só o registro daqui.`)) return;
-    removeClient(c.id);
-    if (selectedId === c.id) setSelectedId(null);
-  }
-
-  function adicionarTodosOsClientes() {
-    const n = ensureOnboardingChecklists();
-    setBulkMsg(n === 0
-      ? 'Todo mundo já está na lista: nenhum cliente novo para adicionar.'
-      : `${n} cliente(s) adicionado(s) com o modelo padrão de checklist.`);
+  // Antes isto chamava removeClient e apagava o cliente inteiro (posts,
+  // vídeos e cobranças perdiam o vínculo), apesar do aviso dizer que não.
+  // Todo cliente tem checklist, então o que faz sentido aqui é recomeçar.
+  function recomecarChecklist(c: Client) {
+    if (!confirm(`Recomeçar a checklist de "${c.name}" do zero, com o modelo padrão? O cadastro do cliente não muda.`)) return;
+    updateClient(c.id, { onboardingChecklist: useOnboardingTemplate.getState().cloneForClient() });
+    setBulkMsg(`Checklist de ${c.name} recomeçada com o modelo padrão.`);
   }
 
   return (
@@ -104,7 +100,6 @@ export default function ClientChecklist() {
         subtitle="Onboarding e entrega de cada cliente, do zero ao concluído, em um único lugar."
         action={
           <>
-            <Button variant="outline" onClick={adicionarTodosOsClientes}><Users size={16} className="text-brand-300" /> Adicionar todos os clientes</Button>
             <Button variant="outline" onClick={() => setTemplateOpen(true)}><Settings2 size={16} className="text-brand-300" /> Modelo padrão</Button>
             <Button onClick={() => setNewOpen(true)}><Plus size={16} /> Novo cliente</Button>
           </>
@@ -199,7 +194,7 @@ export default function ClientChecklist() {
               onAdd={(section, text) => addOnboardingItem(selected.id, section, text)}
               onEdit={(itemId, text) => editOnboardingItem(selected.id, itemId, text)}
               onRemove={(itemId) => removeOnboardingItem(selected.id, itemId)}
-              onDelete={() => excluirCliente(selected)}
+              onDelete={() => recomecarChecklist(selected)}
               onSetPhoto={(photoUrl) => updateClient(selected.id, { photoUrl })}
             />
           )}
@@ -285,7 +280,7 @@ function ClientPanel({
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onDelete} title="Excluir cliente"><Trash2 size={16} className="text-white/50" /></Button>
+          <Button variant="ghost" size="icon" onClick={onDelete} title="Recomeçar a checklist" aria-label="Recomeçar a checklist"><RotateCcw size={16} className="text-white/50" /></Button>
         </div>
         <div className="mt-4">
           <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">

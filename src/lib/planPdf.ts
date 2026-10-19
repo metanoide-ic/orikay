@@ -1,5 +1,6 @@
 import type { Client } from './types';
 import type { PlanItem } from './planner';
+import { nomeDaAgencia } from './agencia';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const DIAS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
@@ -12,7 +13,7 @@ function esc(s: string): string {
 }
 
 /**
- * Abre o planejamento num layout de impressão com a identidade da Origem.
+ * Abre o planejamento num layout de impressão com o nome da agência.
  * O usuário salva como PDF pelo diálogo do navegador (Ctrl+P já aberto).
  */
 export function openPlanPdf(client: Client, items: PlanItem[], year: number, month: number): void {
@@ -59,7 +60,7 @@ export function openPlanPdf(client: Client, items: PlanItem[], year: number, mon
   footer { margin-top: 26px; padding-top: 12px; border-top: 1px solid #e4e4ee; display: flex; justify-content: space-between; font-size: 10px; color: #8a8a99; letter-spacing: 1px; }
 </style></head><body>
 <header>
-  <div class="marca">${LOGO_SVG}<div><div class="nome">Orikay</div><div class="tag">COMUNICAÇÃO &amp; MARKETING</div></div></div>
+  <div class="marca">${LOGO_SVG}<div><div class="nome">Orikay</div><div class="tag">${esc(nomeDaAgencia().toUpperCase())}</div></div></div>
   <div class="doc"><div class="titulo">Planejamento de conteúdo</div><div class="mes">${MESES[month]} ${year}</div></div>
 </header>
 <div class="cliente">
@@ -75,7 +76,7 @@ export function openPlanPdf(client: Client, items: PlanItem[], year: number, mon
   <thead><tr><th>Data</th><th>Formato</th><th>Tema</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
-<footer><span>Origem Comunicação &amp; Marketing</span><span>Estratégia · Criatividade · Resultados</span></footer>
+<footer><span>${esc(nomeDaAgencia())}</span><span>Planejamento feito no Orikay</span></footer>
 <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
 </body></html>`;
 

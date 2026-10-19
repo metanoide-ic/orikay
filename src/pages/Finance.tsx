@@ -25,8 +25,13 @@ import {
   isOverdue, currentMonthKey, monthLabel, METHOD_LABEL,
 } from '@/lib/billing';
 import { generateMonthlyExpenses } from '@/lib/expenses';
+import { DespesasFixas } from '@/components/DespesasFixas';
+import { NUVEM } from '@/lib/nuvem/cliente';
+import { useNuvemStatus } from '@/lib/nuvem/sincronizar';
 import { money, todayISO, cn } from '@/lib/utils';
 import type { TxType, TxStatus } from '@/lib/types';
+import { isoLocal } from '@/lib/utils';
+import { parseBRL } from '@/lib/utils';
 
 const CATEGORIES = ['Contrato', 'Projeto', 'Mídia', 'Software', 'Terceiros', 'Equipe', 'Outros'];
 
@@ -40,11 +45,15 @@ export default function Finance() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
 
   // Gera as cobranças e as contas fixas do mês automaticamente (idempotente).
+  // Na nuvem, espera a agência carregar: com o aparelho ainda vazio, isso
+  // duplicaria cobrança e despesa que já existem.
+  const carregado = useNuvemStatus((x) => x.carregado) || !NUVEM;
   useEffect(() => {
+    if (!carregado) return;
     if (autoBilling) generateMonthlyCharges();
     generateMonthlyExpenses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [carregado]);
 
   const month = currentMonthKey();
   const monthCharges = useMemo(
@@ -82,7 +91,7 @@ export default function Finance() {
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      map.set(d.toISOString().slice(0, 7), { receita: 0, despesa: 0 });
+      map.set(isoLocal(d).slice(0, 7), { receita: 0, despesa: 0 });
     }
     transactions.forEach((t) => {
       const e = map.get(monthKey(t.date));
@@ -132,7 +141,7 @@ export default function Finance() {
   }
 
   function save() {
-    const amount = parseFloat(form.amount.replace(',', '.'));
+    const amount = parseBRL(form.amount) ?? NaN;
     if (!form.description.trim() || !amount || amount <= 0) return;
     addTx({
       type: form.type,
@@ -282,7 +291,7 @@ export default function Finance() {
                             <Button size="sm" variant="outline" onClick={() => markChargePaid(ch.id)}>Marcar paga</Button>
                           </>
                         )}
-                        <button onClick={() => removeCharge(ch.id)} className="grid h-8 w-8 place-items-center rounded-lg text-white/30 opacity-0 transition hover:text-red-300 group-hover:opacity-100">
+                        <button onClick={() => { if (confirm('Apagar esta cobrança? Ela não volta a ser gerada neste mês.')) removeCharge(ch.id); }} aria-label="Apagar cobrança" className="grid h-8 w-8 place-items-center rounded-lg text-white/30 opacity-0 transition hover:text-red-300 group-hover:opacity-100">
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -399,7 +408,7 @@ export default function Finance() {
                     {income ? '+' : '−'} {money(t.amount)}
                   </div>
                   <button
-                    onClick={() => removeTx(t.id)}
+                    onClick={() => { if (confirm(`Apagar o lançamento "${t.description}"?`)) removeTx(t.id); }}
                     className="text-white/20 opacity-0 transition hover:text-red-300 group-hover:opacity-100"
                   >
                     <Trash2 size={16} />
@@ -410,6 +419,8 @@ export default function Finance() {
           </div>
         )}
       </div>
+
+      <DespesasFixas />
 
       <Modal
         open={open}

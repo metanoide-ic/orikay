@@ -19,10 +19,11 @@ import type {
   VideoProject,
   VideoStage,
 } from './types';
-import { uid, acharPorNome, normalizarNome } from './utils';
-import { seedData, OLD_BRIEFINGS } from './seed';
+import { uid, normalizarNome, normalizarLink } from './utils';
+import { seedData } from './seed';
 import { useOnboardingTemplate } from './onboardingTemplate';
 import { useAuth } from './authStore';
+import { useSettings } from './settingsStore';
 
 /** Todo tipo de registro que participa da sincronização com o Conector. */
 type TipoRegistro = 'post' | 'video' | 'cliente' | 'transacao' | 'cobranca' | 'biblioteca' | 'campanha';
@@ -54,22 +55,6 @@ interface DataState {
 
   loadDemo: () => void;
   /** Repõe clientes da carteira que tenham sido removidos, sem apagar nada. */
-  restoreClients: () => number;
-  /**
-   * Preenche fee, dia de vencimento, forma de pagamento e contato de quem já
-   * existe mas nasceu sem esses dados (base antiga, de antes da carteira ter
-   * sido cadastrada). Só entra em campo que estiver vazio — nunca sobrescreve
-   * o que já foi preenchido na tela (grupo, WhatsApp de cobrança, documento).
-   */
-  restoreBillingFields: () => number;
-  /**
-   * Atualiza o briefing de quem ainda está com a versão antiga (igual ao
-   * que já veio pronto de fábrica), trazendo pesquisa nova feita sobre os
-   * clientes reais. Nunca mexe em briefing que a equipe já editou na tela —
-   * só troca quando o texto atual é idêntico ao briefing anterior salvo em
-   * código, senão ficaria sobrescrevendo edição manual de alguém.
-   */
-  restoreBriefings: () => number;
   resetAll: () => void;
 
   // Clientes
@@ -106,7 +91,7 @@ interface DataState {
   ) => void;
 
   // Financeiro
-  addTx: (t: Omit<Transaction, 'id' | 'createdAt'>) => void;
+  addTx: (t: Omit<Transaction, 'id' | 'createdAt'> & { id?: string }) => void;
   updateTx: (id: string, patch: Partial<Transaction>) => void;
   removeTx: (id: string) => void;
 
@@ -332,6 +317,13 @@ export const useData = create<DataState>()(
        * Conector faria o registro "ressuscitar" quando outro dispositivo
        * ainda tem ele localmente e manda de volta.
        */
+      /** Cobrança/despesa fixa gerada sozinha e apagada de propósito: não volta no mês. */
+      function lembrarGeradoApagado(id: string) {
+        if (!/^(chg|fixa)_/.test(id)) return;
+        const atual = useSettings.getState().geracaoIgnorada ?? [];
+        if (!atual.includes(id)) useSettings.getState().update({ geracaoIgnorada: [id, ...atual].slice(0, 400) });
+      }
+
       function marcarExcluido(tipo: TipoRegistro, id: string) {
         set((s) => ({
           tombstones: [{ tipo, id, quando: Date.now() }, ...s.tombstones].slice(0, 500),
@@ -344,53 +336,6 @@ export const useData = create<DataState>()(
 
       loadDemo: () => set({ ...seedData(), seeded: true }),
 
-      restoreClients: () => {
-        const atuais = get().clients;
-        // Aproximado, não exato: "Agente Omni Cotia" e "Omni Cotia" contam
-        // como o mesmo cliente, para não duplicar quem só mudou de grafia.
-        const faltando = seedData().clients.filter(
-          (c) => !acharPorNome(c.name, atuais, (a) => a.name),
-        );
-        if (faltando.length) set((s) => ({ clients: [...s.clients, ...faltando] }));
-        return faltando.length;
-      },
-      restoreBillingFields: () => {
-        const seedClients = seedData().clients;
-        let corrigidos = 0;
-        set((s) => ({
-          clients: s.clients.map((c) => {
-            const base = acharPorNome(c.name, seedClients, (sc) => sc.name);
-            if (!base) return c;
-            const patch: Partial<Client> = {};
-            if (!c.monthlyFee && base.monthlyFee) patch.monthlyFee = base.monthlyFee;
-            if (!c.billingDay && base.billingDay) patch.billingDay = base.billingDay;
-            if (!c.billingMethod && base.billingMethod) patch.billingMethod = base.billingMethod;
-            if (!c.contact && base.contact) patch.contact = base.contact;
-            if (Object.keys(patch).length === 0) return c;
-            corrigidos++;
-            return { ...c, ...patch };
-          }),
-        }));
-        return corrigidos;
-      },
-      restoreBriefings: () => {
-        const seedClients = seedData().clients;
-        let atualizados = 0;
-        set((s) => ({
-          clients: s.clients.map((c) => {
-            const base = acharPorNome(c.name, seedClients, (sc) => sc.name);
-            if (!base || !base.briefing) return c;
-            // Só troca se o briefing salvo ainda bate com uma das versões
-            // "de fábrica" de rodadas anteriores — se a equipe já editou na
-            // tela, ou já está com a pesquisa mais nova, não mexe.
-            const antigos = OLD_BRIEFINGS[c.name];
-            if (!antigos || c.briefing === undefined || !antigos.includes(c.briefing) || c.briefing === base.briefing) return c;
-            atualizados++;
-            return { ...c, briefing: base.briefing };
-          }),
-        }));
-        return atualizados;
-      },
       resetAll: () => set({ ...empty, seeded: true }),
 
       // ---------- Clientes ----------
@@ -626,7 +571,7 @@ export const useData = create<DataState>()(
       // ---------- Financeiro ----------
       addTx: (t) =>
         set((s) => ({
-          transactions: [{ ...t, id: uid('tx'), createdAt: Date.now(), updatedAt: Date.now() }, ...s.transactions],
+          transactions: [{ ...t, id: t.id ?? uid('tx'), createdAt: Date.now(), updatedAt: Date.now() }, ...s.transactions],
         })),
       updateTx: (id, patch) =>
         set((s) => ({
@@ -634,6 +579,7 @@ export const useData = create<DataState>()(
         })),
       removeTx: (id) => {
         marcarExcluido('transacao', id);
+        lembrarGeradoApagado(id);
         set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }));
       },
 
@@ -678,7 +624,7 @@ export const useData = create<DataState>()(
         set((s) => ({
           posts: s.posts.map((p) =>
             p.id === postId
-              ? { ...p, revisions: [...(p.revisions ?? []), { id: uid('rev'), text, resolved: false, createdAt: Date.now() }] }
+              ? { ...p, updatedAt: Date.now(), revisions: [...(p.revisions ?? []), { id: uid('rev'), text, resolved: false, createdAt: Date.now() }] }
               : p,
           ),
         })),
@@ -686,14 +632,14 @@ export const useData = create<DataState>()(
         set((s) => ({
           posts: s.posts.map((p) =>
             p.id === postId
-              ? { ...p, revisions: (p.revisions ?? []).map((r) => (r.id === revId ? { ...r, ...patch } : r)) }
+              ? { ...p, updatedAt: Date.now(), revisions: (p.revisions ?? []).map((r) => (r.id === revId ? { ...r, ...patch } : r)) }
               : p,
           ),
         })),
       removeRevision: (postId, revId) =>
         set((s) => ({
           posts: s.posts.map((p) =>
-            p.id === postId ? { ...p, revisions: (p.revisions ?? []).filter((r) => r.id !== revId) } : p,
+            p.id === postId ? { ...p, updatedAt: Date.now(), revisions: (p.revisions ?? []).filter((r) => r.id !== revId) } : p,
           ),
         })),
 
@@ -717,20 +663,20 @@ export const useData = create<DataState>()(
       addVideoLink: (id, link) =>
         set((s) => ({
           videos: s.videos.map((v) =>
-            v.id === id ? { ...v, links: [...v.links, { ...link, id: uid('lnk') }] } : v,
+            v.id === id ? { ...v, updatedAt: Date.now(), links: [...v.links, { ...link, url: normalizarLink(link.url), id: uid('lnk') }] } : v,
           ),
         })),
       removeVideoLink: (id, linkId) =>
         set((s) => ({
           videos: s.videos.map((v) =>
-            v.id === id ? { ...v, links: v.links.filter((l) => l.id !== linkId) } : v,
+            v.id === id ? { ...v, updatedAt: Date.now(), links: v.links.filter((l) => l.id !== linkId) } : v,
           ),
         })),
       addVideoRevision: (id, text) =>
         set((s) => ({
           videos: s.videos.map((v) =>
             v.id === id
-              ? { ...v, revisions: [...v.revisions, { id: uid('rev'), text, resolved: false, createdAt: Date.now() }] }
+              ? { ...v, updatedAt: Date.now(), revisions: [...v.revisions, { id: uid('rev'), text, resolved: false, createdAt: Date.now() }] }
               : v,
           ),
         })),
@@ -738,7 +684,7 @@ export const useData = create<DataState>()(
         set((s) => ({
           videos: s.videos.map((v) =>
             v.id === id
-              ? { ...v, revisions: v.revisions.map((r) => (r.id === revId ? { ...r, resolved: !r.resolved } : r)) }
+              ? { ...v, updatedAt: Date.now(), revisions: v.revisions.map((r) => (r.id === revId ? { ...r, resolved: !r.resolved } : r)) }
               : v,
           ),
         })),
@@ -794,6 +740,7 @@ export const useData = create<DataState>()(
         set((s) => ({ charges: s.charges.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c)) })),
       removeCharge: (id) => {
         marcarExcluido('cobranca', id);
+        lembrarGeradoApagado(id);
         set((s) => ({ charges: s.charges.filter((c) => c.id !== id) }));
       },
 

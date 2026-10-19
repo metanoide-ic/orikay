@@ -1,5 +1,6 @@
 import { useData } from './dataStore';
 import type { Client, PostPlatform } from './types';
+import { isoLocal } from './utils';
 
 export interface Holiday {
   md: string; // 'MM-DD'
@@ -41,6 +42,28 @@ export const HOLIDAYS: Holiday[] = [
   { md: '12-25', name: 'Natal', universal: true },
   { md: '12-31', name: 'Réveillon', universal: true },
 ];
+
+/** Dia do mês do n-ésimo `diaSemana` (0 = domingo) de um mês. */
+function enesimo(year: number, month: number, diaSemana: number, n: number): number {
+  const primeiro = new Date(year, month, 1).getDay();
+  return 1 + ((diaSemana - primeiro + 7) % 7) + (n - 1) * 7;
+}
+
+const md = (m: number, d: number) => `${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+/**
+ * Datas comemorativas de um ano. Dia das Mães e dos Pais caem no 2º domingo
+ * (maio e agosto) e a Black Friday na sexta depois da 4ª quinta de novembro:
+ * com a data fixa, o planejamento e o calendário marcavam o dia errado.
+ */
+export function holidaysOf(year: number): Holiday[] {
+  const moveis: Record<string, string> = {
+    'Dia das Mães': md(4, enesimo(year, 4, 0, 2)),
+    'Dia dos Pais': md(7, enesimo(year, 7, 0, 2)),
+    'Black Friday': md(10, enesimo(year, 10, 4, 4) + 1),
+  };
+  return HOLIDAYS.map((h) => (moveis[h.name] ? { ...h, md: moveis[h.name] } : h));
+}
 
 export interface PlanItem {
   date: string; // ISO
@@ -191,7 +214,7 @@ export function buildClientSlots(client: Client, year: number, month: number, fr
       proprias.push({ md, name: `Aniversário de ${cidade}` });
     }
   }
-  const monthHolidays = [...HOLIDAYS, ...proprias].filter(
+  const monthHolidays = [...holidaysOf(year), ...proprias].filter(
     (h) => Number(h.md.slice(0, 2)) === month + 1,
   );
   const items: PlanItem[] = [];
@@ -240,8 +263,8 @@ function platformFor(type: string): PostPlatform {
 function dueDateFor(publishDate: string): string {
   const d = new Date(publishDate + 'T00:00');
   d.setDate(d.getDate() - 2);
-  const today = new Date().toISOString().slice(0, 10);
-  const due = d.toISOString().slice(0, 10);
+  const today = isoLocal();
+  const due = isoLocal(d);
   return due < today ? today : due;
 }
 

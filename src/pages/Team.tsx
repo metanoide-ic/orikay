@@ -85,7 +85,7 @@ export default function Team() {
         <div className="space-y-4">
           <Field label="Nome / login"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Marina Costa" autoFocus /></Field>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Senha inicial"><Input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••" /></Field>
+            <Field label="Senha provisória"><Input type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••" /></Field>
             <Field label="Cargo">
               <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 {['Social Media', 'Designer', 'Editor de vídeo', 'Gestor de tráfego', 'Atendimento', 'Direção'].map((r) => <option key={r}>{r}</option>)}

@@ -16,6 +16,12 @@ import { useLiveSync, useSyncStatus } from '@/lib/sync';
 import { autoSendDueCharges } from '@/lib/billing';
 import { generateMonthlyExpenses } from '@/lib/expenses';
 import { cn } from '@/lib/utils';
+import { NUVEM } from '@/lib/nuvem/cliente';
+import { sair, trocarDeAgencia, useSessao } from '@/lib/nuvem/sessao';
+import { useNuvemStatus } from '@/lib/nuvem/sincronizar';
+import { useNomeDaAgencia } from '@/lib/agencia';
+import { useAgendaNoConector } from '@/lib/agenda';
+import { ImportarLegado } from '@/pages/Acesso';
 
 interface NavDef { to: string; label: string; icon: typeof KanbanSquare; end?: boolean; }
 
@@ -117,6 +123,37 @@ function NotificationBell() {
  * Clicar leva pra Integrações, onde se configura/conserta.
  */
 function SyncPill({ compact }: { compact?: boolean }) {
+  return NUVEM ? <PilulaNuvem compact={compact} /> : <PilulaConector compact={compact} />;
+}
+
+/** Na nuvem: salvo, salvando, sem internet (com quantas alterações esperando) ou com erro. */
+function PilulaNuvem({ compact }: { compact?: boolean }) {
+  const { estado, pendentes } = useNuvemStatus();
+  const mapa: Record<string, [string, string, string]> = {
+    ok: ['bg-emerald-400', 'Tudo salvo na nuvem', 'A equipe vê cada alteração na hora, em qualquer aparelho.'],
+    enviando: ['bg-brand-400 animate-pulse', 'Salvando…', 'Enviando suas últimas alterações.'],
+    carregando: ['bg-white/40 animate-pulse', 'Carregando a agência…', 'Buscando os dados da agência.'],
+    offline: ['bg-amber-400', pendentes ? `Sem internet · ${pendentes} para enviar` : 'Sem internet', 'Pode continuar trabalhando: o que você fizer sobe sozinho quando a conexão voltar.'],
+    erro: ['bg-red-400', pendentes ? `Não salvou · ${pendentes} esperando` : 'Problema ao salvar', 'Tentando de novo sozinho. Se continuar, recarregue a página.'],
+    parado: ['bg-white/30', 'Conectando…', 'Conectando à nuvem.'],
+  };
+  const [cor, rotulo, detalhe] = mapa[estado] ?? mapa.parado;
+  if (compact) {
+    return (
+      <span title={`${rotulo} — ${detalhe}`} className="grid h-10 w-10 place-items-center" aria-label={rotulo}>
+        <span className={cn('h-2.5 w-2.5 rounded-full', cor)} />
+      </span>
+    );
+  }
+  return (
+    <div title={detalhe} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-ink-850 px-3 py-2 text-xs text-white/60">
+      <span className={cn('h-2 w-2 shrink-0 rounded-full', cor)} />
+      <span className="truncate">{rotulo}</span>
+    </div>
+  );
+}
+
+function PilulaConector({ compact }: { compact?: boolean }) {
   const connectorUrl = useSettings((s) => s.connectorUrl);
   const { ultimaVez, ultimoErro } = useSyncStatus();
   const navigate = useNavigate();
@@ -162,8 +199,15 @@ function SyncPill({ compact }: { compact?: boolean }) {
 function UserCard() {
   const user = useAuth((s) => s.current());
   const logout = useAuth((s) => s.logout);
+  const agencias = useSessao((s) => s.agencias);
+  const agenciaId = useSessao((s) => s.agenciaId);
   const navigate = useNavigate();
   if (!user) return null;
+  async function sairDaConta() {
+    if (NUVEM) await sair();
+    else logout();
+    navigate('/');
+  }
   return (
     <div className="rounded-xl border border-line bg-ink-850 p-3">
       <div className="flex items-center gap-3">
@@ -173,11 +217,17 @@ function UserCard() {
           <div className="truncate text-xs text-white/45">{user.role}</div>
         </div>
       </div>
+      {NUVEM && agencias.length > 1 && (
+        <select value={agenciaId ?? ''} onChange={(e) => void trocarDeAgencia(e.target.value)}
+          className="mt-2 w-full rounded-lg border border-line bg-ink-900 px-2 py-1.5 text-xs text-white/70" aria-label="Trocar de agência">
+          {agencias.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+        </select>
+      )}
       <div className="mt-2 flex gap-1">
         <button onClick={() => navigate('/app/config')} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-white/60 hover:bg-white/5 hover:text-white">
           <Settings size={14} /> Ajustes
         </button>
-        <button onClick={() => { logout(); navigate('/'); }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-white/60 hover:bg-red-500/10 hover:text-red-300">
+        <button onClick={() => void sairDaConta()} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-white/60 hover:bg-red-500/10 hover:text-red-300">
           <LogOut size={14} /> Sair
         </button>
       </div>
@@ -189,24 +239,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
   const canFinance = useAuth((s) => s.current()?.canFinance);
+  const nomeAgencia = useNomeDaAgencia();
+  // Na nuvem, rotina automática só roda com a agência carregada: com o
+  // aparelho ainda vazio, ela criaria despesa ou cobrança que já existe.
+  const carregado = useNuvemStatus((s) => s.carregado) || !NUVEM;
   useApprovalInbox();
   useLiveSync();
+  useAgendaNoConector(carregado);
 
   // Cobrança do dia: roda sozinha ao abrir a plataforma, em qualquer tela,
   // não só quando alguém entra no Financeiro. Só quem tem permissão de
   // financeiro dispara, para não sair cobrando cliente porque o designer
   // abriu o app de manhã.
   useEffect(() => {
-    if (!canFinance) return;
+    if (!canFinance || !carregado) return;
     generateMonthlyExpenses();
     void autoSendDueCharges();
-  }, [canFinance]);
+  }, [canFinance, carregado]);
 
   return (
     <div className="min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-ink-900/60 p-4 backdrop-blur-xl lg:flex">
         <div className="flex items-center justify-between px-2 py-2">
-          <Logo size="sm" />
+          <Logo size="sm" tagline={nomeAgencia} />
           <NotificationBell />
         </div>
         <div className="mt-6 flex-1 overflow-y-auto"><NavItems /></div>
@@ -246,6 +301,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       <AIHelper />
+      {NUVEM && <ImportarLegado />}
     </div>
   );
 }

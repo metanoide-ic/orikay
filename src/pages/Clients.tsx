@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MensagensSemanais } from '@/components/MensagensSemanais';
 import { Plus, Users, Trash2, Pencil, CalendarRange, Loader2, MessageCircle, Instagram, AtSign, Send, ClipboardPaste } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button, Field, Input, Textarea, Modal, Select, EmptyState } from '@/components/ui';
 import { PlanModal } from '@/components/PlanModal';
 import { buildClientSlots, applyPlanToWorkspace } from '@/lib/planner';
 import { generatePlanIdeas } from '@/lib/ai';
-import { omniAtivos, sendOmniBroadcast } from '@/lib/broadcast';
+import { clientesComGrupo, sendBroadcast } from '@/lib/broadcast';
 import { applyBillingContacts } from '@/lib/contacts';
 import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
 import { AVATAR_COLORS, money, initials, cn } from '@/lib/utils';
 import { AREA_LABEL, RAIO_PADRAO_KM } from '@/lib/adsPlaybook';
-import type { BillingMethod, Client, ServiceArea, WeeklyPlan } from '@/lib/types';
+import type { BillingMethod, Client, ServiceArea, WeeklyPlan, MensagemSemanal } from '@/lib/types';
+import { parseBRL } from '@/lib/utils';
 
 const WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -37,6 +39,7 @@ const blank = {
   briefing: '', cities: '', localDates: '', whatsappGroup: '',
   billingWhatsapp: '', billingMethod: 'pix' as BillingMethod, billingDay: '5', document: '', serviceArea: 'cidade' as ServiceArea, serviceRadiusKm: '',
   weekly: {} as WeeklyPlan,
+  mensagens: [] as MensagemSemanal[],
 };
 
 export default function Clients() {
@@ -51,7 +54,7 @@ export default function Clients() {
 
   /**
    * Gera o mês da carteira de uma vez. Só entra quem tem cadência: agentes
-   * Omni (conteúdo vem do Banco Omni) e clientes sob demanda ficam de fora
+   * de rede (o conteúdo vem do cliente principal) e clientes sob demanda ficam de fora
    * por definição, não por esquecimento. `modo: 'restante'` gera só do dia
    * de hoje até o fim do mês corrente (pra completar o que falta de agora
    * em diante); `'proximo'` gera o mês seguinte inteiro, como sempre foi.
@@ -59,8 +62,9 @@ export default function Clients() {
   async function gerarMesDeTodos(modo: 'proximo' | 'restante') {
     if (batchBusy) return;
     const hoje = new Date();
-    const alvoData = new Date();
-    if (modo === 'proximo') alvoData.setMonth(alvoData.getMonth() + 1);
+    // Dia 1 do mês alvo: setMonth(+1) a partir do dia 31 pulava um mês
+    // inteiro (31/out + 1 mês = 1º/dez).
+    const alvoData = new Date(hoje.getFullYear(), hoje.getMonth() + (modo === 'proximo' ? 1 : 0), 1);
     const year = alvoData.getFullYear();
     const month = alvoData.getMonth();
     const fromDay = modo === 'restante' ? hoje.getDate() : 1;
@@ -87,16 +91,18 @@ export default function Clients() {
         ? `O período ${periodo} já estava planejado: nada novo a criar. Rodar de novo não duplica.`
         : `Planejamento ${periodo} gerado para ${feitos} cliente(s): ` +
           `${posts} post(s) e ${videos} vídeo(s). ` +
-          `Quem não tem cadência (agentes Omni e clientes sob demanda) ficou de fora de propósito.`,
+          `Quem não tem cadência (clientes de rede e sob demanda) ficou de fora de propósito.`,
     );
   }
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null);
   const [form, setForm] = useState(blank);
-  const [omniOpen, setOmniOpen] = useState(false);
-  const [omniMsg, setOmniMsg] = useState('');
-  const [omniBusy, setOmniBusy] = useState(false);
-  const [omniResult, setOmniResult] = useState('');
-  const alvosOmni = omniAtivos();
+  // Mensagem para vários clientes de uma vez (grupo de cada um no WhatsApp).
+  const [massaOpen, setMassaOpen] = useState(false);
+  const [massaMsg, setMassaMsg] = useState('');
+  const [massaBusy, setMassaBusy] = useState(false);
+  const [massaResult, setMassaResult] = useState('');
+  const comGrupo = useMemo(() => clients.filter((c) => c.whatsappGroup), [clients]);
+  const [massaAlvos, setMassaAlvos] = useState<Set<string>>(new Set());
 
   const [contatosOpen, setContatosOpen] = useState(false);
   const [contatosTexto, setContatosTexto] = useState('');
@@ -108,17 +114,24 @@ export default function Clients() {
     setContatosTexto('');
   }
 
-  async function dispararOmnis() {
-    if (!omniMsg.trim() || omniBusy) return;
-    setOmniBusy(true);
-    const { enviados, falhas } = await sendOmniBroadcast(omniMsg.trim());
-    setOmniBusy(false);
-    setOmniResult(
+  function abrirMassa() {
+    setMassaResult('');
+    setMassaAlvos(new Set(clientesComGrupo().map((c) => c.id)));
+    setMassaOpen(true);
+  }
+
+  async function dispararMassa() {
+    const alvos = comGrupo.filter((c) => massaAlvos.has(c.id));
+    if (!massaMsg.trim() || massaBusy || alvos.length === 0) return;
+    setMassaBusy(true);
+    const { enviados, falhas } = await sendBroadcast(massaMsg.trim(), alvos);
+    setMassaBusy(false);
+    setMassaResult(
       falhas === 0
-        ? `Enviado para ${enviados} agente(s) Omni.`
+        ? `Enviado para ${enviados} cliente(s).`
         : `Enviado para ${enviados} — ${falhas} falharam (confira o WhatsApp em Integrações).`,
     );
-    setOmniMsg('');
+    setMassaMsg('');
   }
 
   function openNew() { setEditing(null); setForm(blank); setOpen(true); }
@@ -134,6 +147,7 @@ export default function Clients() {
       billingDay: (c.billingDay ?? 5).toString(), document: c.document ?? '',
       serviceArea: c.serviceArea ?? 'cidade', serviceRadiusKm: (c.serviceRadiusKm ?? '').toString(),
       weekly: { ...(c.weeklyPlan ?? {}) },
+      mensagens: c.mensagensSemanais ?? [],
     });
     setOpen(true);
   }
@@ -152,7 +166,7 @@ export default function Clients() {
       name: form.name.trim(),
       contact: form.contact.trim() || undefined,
       instagram: form.instagram.trim().replace(/^@/, '') || undefined,
-      monthlyFee: form.monthlyFee ? parseFloat(form.monthlyFee.replace(',', '.')) : undefined,
+      monthlyFee: parseBRL(form.monthlyFee),
       color: form.color,
       briefing: form.briefing.trim() || undefined,
       cities: form.cities.split(',').map((x) => x.trim()).filter(Boolean),
@@ -167,6 +181,7 @@ export default function Clients() {
         ? (parseInt(form.serviceRadiusKm, 10) || RAIO_PADRAO_KM)
         : undefined,
       weeklyPlan: form.weekly,
+      mensagensSemanais: form.mensagens.filter((m) => m.mensagem.trim()),
     };
     if (editing) updateClient(editing.id, payload);
     else addClient(payload);
@@ -183,8 +198,8 @@ export default function Clients() {
             <Button variant="outline" onClick={() => { setContatosResult(null); setContatosOpen(true); }}>
               <ClipboardPaste size={16} /> Importar contatos de cobrança
             </Button>
-            <Button variant="outline" onClick={() => { setOmniResult(''); setOmniOpen(true); }}>
-              <Send size={16} /> Falar com as Omnis
+            <Button variant="outline" onClick={abrirMassa}>
+              <Send size={16} /> Mensagem para vários
             </Button>
             <Button variant="outline" onClick={() => gerarMesDeTodos('restante')} disabled={batchBusy}>
               {batchBusy ? <Loader2 size={16} className="animate-spin" /> : <CalendarRange size={16} />}
@@ -290,11 +305,11 @@ export default function Clients() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome do cliente"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Ótica Vista Clara" autoFocus /></Field>
             <Field label="Cidades onde atende" hint="Separe por vírgula. Cliente regional pode ter várias.">
-              <Input value={form.cities} onChange={(e) => setForm({ ...form, cities: e.target.value })} placeholder="Barra Mansa, Volta Redonda, Resende" />
+              <Input value={form.cities} onChange={(e) => setForm({ ...form, cities: e.target.value })} placeholder="Ex.: Campinas, Valinhos, Vinhedo" />
             </Field>
             <Field label="Datas próprias" hint="Uma por linha: dia/mês e o nome. Entram no planejamento como post garantido.">
               <Textarea value={form.localDates} onChange={(e) => setForm({ ...form, localDates: e.target.value })}
-                placeholder={'10/03 Aniversário de Barra do Piraí\n15/08 Aniversário da loja'} className="min-h-[70px]" />
+                placeholder={'14/07 Aniversário de Campinas\n15/08 Aniversário da loja'} className="min-h-[70px]" />
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -305,6 +320,9 @@ export default function Clients() {
               </div>
             </Field>
             <Field label="Grupo de WhatsApp"><Input value={form.whatsappGroup} onChange={(e) => setForm({ ...form, whatsappGroup: e.target.value })} placeholder="Nome ou ID do grupo" /></Field>
+            <div className="sm:col-span-2">
+              <MensagensSemanais valor={form.mensagens} onChange={(mensagens) => setForm({ ...form, mensagens })} />
+            </div>
             <Field label={canFinance ? 'Fee mensal' : 'Contato'}>
               {canFinance
                 ? <Input value={form.monthlyFee} onChange={(e) => setForm({ ...form, monthlyFee: e.target.value })} placeholder="0,00" inputMode="decimal" />
@@ -414,11 +432,11 @@ export default function Clients() {
         <div className="space-y-4">
           <p className="text-sm text-white/60">
             Uma linha por cliente, no formato <b>Nome do cliente: telefone</b> — o nome precisa bater com o
-            cadastrado aqui na plataforma. Isso fica salvo só neste navegador, nunca entra no código do site.
+            cadastrado aqui na plataforma. O número fica no cadastro do cliente, nunca no código do site.
           </p>
           <Field label="Contatos">
             <Textarea value={contatosTexto} onChange={(e) => setContatosTexto(e.target.value)} className="min-h-[160px] font-mono text-xs"
-              placeholder={'Omni Cotia: +55 11 99639-1855\nVidroscar: +55 24 99238-8134'} autoFocus />
+              placeholder={'Ótica Ramalho: +55 21 99999-0000\nJR Freios e Peças: +55 11 98888-0000'} autoFocus />
           </Field>
           {contatosResult && (
             <div className="space-y-2 text-sm">
@@ -433,26 +451,46 @@ export default function Clients() {
         </div>
       </Modal>
 
-      {/* Aviso em massa para os agentes Omni ativos */}
-      <Modal open={omniOpen} onClose={() => setOmniOpen(false)} title="Falar com as Omnis"
-        footer={<><Button variant="ghost" onClick={() => setOmniOpen(false)}>Fechar</Button>
-          <Button onClick={dispararOmnis} disabled={omniBusy || !omniMsg.trim()}>
-            {omniBusy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Enviar para todas
+      {/* Mesma mensagem para o grupo de vários clientes */}
+      <Modal open={massaOpen} onClose={() => setMassaOpen(false)} title="Mensagem para vários clientes" wide
+        footer={<><Button variant="ghost" onClick={() => setMassaOpen(false)}>Fechar</Button>
+          <Button onClick={dispararMassa} disabled={massaBusy || !massaMsg.trim() || massaAlvos.size === 0}>
+            {massaBusy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Enviar para {massaAlvos.size}
           </Button></>}>
         <div className="space-y-4">
           <p className="text-sm text-white/60">
-            Manda a mesma mensagem para o grupo de WhatsApp de cada agente Omni que ainda está ativo
-            (tem o grupo cadastrado). Quem saiu não recebe — não tem grupo vinculado.
+            Manda a mesma mensagem no grupo de WhatsApp de cada cliente marcado. Só aparece quem tem o grupo cadastrado.
           </p>
-          <div className="rounded-lg border border-line bg-white/[0.02] px-3.5 py-2.5 text-sm text-white/70">
-            {alvosOmni.length} agente(s) Omni com grupo cadastrado{' '}
-            {alvosOmni.length === 0 && <span className="text-amber-300/80">— vincule o grupo de cada um em Clientes primeiro.</span>}
-          </div>
+          {comGrupo.length === 0 ? (
+            <div className="rounded-lg border border-line bg-white/[0.02] px-3.5 py-2.5 text-sm text-amber-300/80">
+              Nenhum cliente com grupo cadastrado. Vincule os grupos em Integrações → WhatsApp.
+            </div>
+          ) : (
+            <div>
+              <div className="mb-2 flex gap-3 text-xs text-white/50">
+                <button onClick={() => setMassaAlvos(new Set(comGrupo.map((c) => c.id)))} className="hover:text-white">Marcar todos</button>
+                <button onClick={() => setMassaAlvos(new Set())} className="hover:text-white">Desmarcar todos</button>
+              </div>
+              <div className="grid max-h-48 gap-1 overflow-y-auto rounded-lg border border-line bg-white/[0.02] p-2 sm:grid-cols-2">
+                {comGrupo.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-white/75 hover:bg-white/5">
+                    <input type="checkbox" checked={massaAlvos.has(c.id)} className="h-4 w-4 accent-[#7c5cff]"
+                      onChange={(e) => setMassaAlvos((atual) => {
+                        const n = new Set(atual);
+                        if (e.target.checked) n.add(c.id); else n.delete(c.id);
+                        return n;
+                      })} />
+                    <span className="truncate">{c.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <Field label="Mensagem">
-            <Textarea value={omniMsg} onChange={(e) => setOmniMsg(e.target.value)} className="min-h-[110px]"
-              placeholder="Ex.: Pessoal, lembrando de mandar as fotos dos carros da semana até quinta." autoFocus />
+            <Textarea value={massaMsg} onChange={(e) => setMassaMsg(e.target.value)} className="min-h-[110px]"
+              placeholder="Ex.: Pessoal, lembrando de mandar as fotos da semana até quinta." autoFocus />
           </Field>
-          {omniResult && <p className="text-sm text-white/70">{omniResult}</p>}
+          {massaResult && <p className="text-sm text-white/70">{massaResult}</p>}
         </div>
       </Modal>
 

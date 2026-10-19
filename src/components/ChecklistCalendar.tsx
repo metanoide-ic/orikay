@@ -79,8 +79,11 @@ const STATUS_STYLE: Record<Status, string> = {
  * pra adicionar itens extras manualmente em qualquer dia.
  */
 export function ChecklistCalendar() {
-  const posts = useData((s) => s.posts);
-  const videos = useData((s) => s.videos);
+  // Arquivado saiu do fluxo: não conta como pendente do dia.
+  const todosPosts = useData((s) => s.posts);
+  const todosVideos = useData((s) => s.videos);
+  const posts = useMemo(() => todosPosts.filter((p) => !p.archived), [todosPosts]);
+  const videos = useMemo(() => todosVideos.filter((v) => !v.archived), [todosVideos]);
   const extras = useData((s) => s.checklistExtras);
   const clientMap = useClientMap();
   const today = todayISO();

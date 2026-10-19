@@ -69,11 +69,55 @@ export function pickColor(seed: string): string {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
+/**
+ * Data AAAA-MM-DD no fuso do aparelho. `toISOString()` é UTC: no Brasil,
+ * depois das 21h ele já devolve o dia seguinte (e no último dia do mês, o
+ * mês seguinte, o que gerava cobrança adiantada).
+ */
+export function isoLocal(d: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoLocal();
 }
 
 /** Capa de um post/vídeo: primeiro item da galeria, ou o mediaUrl antigo (compatibilidade). */
 export function coverOf(item: { mediaUrls?: string[]; mediaUrl?: string }): string | undefined {
   return item.mediaUrls?.[0] ?? item.mediaUrl;
+}
+
+/**
+ * Lê um valor em reais digitado do jeito brasileiro: "1.500,00", "1500,5",
+ * "R$ 2.000" ou "1500.50". Antes, "1.500,00" virava 1,5 (o ponto de milhar
+ * era lido como vírgula decimal) e a cobrança saía com o fee errado.
+ * Devolve `undefined` se não for um número.
+ */
+export function parseBRL(texto: string | undefined | null): number | undefined {
+  let t = String(texto ?? '').replace(/R\$|\s/gi, '');
+  if (!t) return undefined;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if ((t.match(/\./g) ?? []).length > 1 || /\.\d{3}$/.test(t)) t = t.replace(/\./g, '');
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Link digitado pela equipe, pronto para abrir: sem "https://" ele abria
+ * como caminho dentro do próprio site; "javascript:" e outros esquemas são
+ * recusados (viram texto, sem link).
+ */
+export function normalizarLink(url: string): string {
+  const t = url.trim();
+  if (!t) return t;
+  if (/^https?:\/\//i.test(t)) return t;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t) && !/^[\w.-]+:\d/.test(t)) return ''; // outro esquema (javascript:, data:...)
+  return `https://${t.replace(/^\/+/, '')}`;
+}
+
+/** href seguro: só http(s); o resto não vira link. */
+export function hrefSeguro(url: string | undefined): string | undefined {
+  const n = normalizarLink(url ?? '');
+  return n || undefined;
 }

@@ -1,5 +1,6 @@
 import type { Campaign, CampaignDay, Client } from './types';
 import { derived } from './ads';
+import { isoLocal } from './utils';
 import {
   AREA_LABEL, AREA_ORDEM, FREQUENCIA_LIMITE, PLATFORM_RULES,
   abrangenciaReal, descreverGeo, verbaParaAprender,
@@ -101,7 +102,7 @@ function diasEntre(de: string, ate: string): number {
 export function diagnosticar(
   c: Campaign,
   client?: Client,
-  hoje = new Date().toISOString().slice(0, 10),
+  hoje = isoLocal(),
 ): Achado[] {
   const achados: Achado[] = [];
   const m = c.metrics;

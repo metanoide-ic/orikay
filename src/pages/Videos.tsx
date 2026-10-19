@@ -128,6 +128,8 @@ export default function Videos() {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (target.closest('[data-video-id], [data-col-handle], button, textarea, input, select, a')) return;
+    // Dentro de modal, menu lateral ou painel flutuante (IA) não é o quadro.
+    if (target.closest('[role="dialog"], .fixed, aside, header')) return;
     const additive = e.shiftKey || e.ctrlKey || e.metaKey;
     const x1 = e.clientX;
     let y1 = e.clientY;
@@ -232,7 +234,7 @@ export default function Videos() {
         icon: <Archive size={15} />,
         onSelect: () => { updateVideo(video.id, { archived: true }); avisar('Cartão arquivado.'); },
       },
-      { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => removeVideo(video.id) },
+      { label: 'Excluir', icon: <Trash2 size={15} />, danger: true, onSelect: () => { if (confirm(`Excluir o vídeo "${video.title}"? Não dá para desfazer. Para tirar do quadro sem perder, use Arquivar.`)) removeVideo(video.id); } },
     ];
   }
 

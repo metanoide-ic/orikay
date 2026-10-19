@@ -62,8 +62,11 @@ function linhaDoVideo(v: VideoProject, clienteNome: string): Linha {
  * marcar como postado na hora, e o item some da lista de pendentes.
  */
 export function DailyChecklist({ fullPage = false }: { fullPage?: boolean }) {
-  const posts = useData((s) => s.posts);
-  const videos = useData((s) => s.videos);
+  // Arquivado saiu do fluxo: não conta como pendente do dia.
+  const todosPosts = useData((s) => s.posts);
+  const todosVideos = useData((s) => s.videos);
+  const posts = useMemo(() => todosPosts.filter((p) => !p.archived), [todosPosts]);
+  const videos = useMemo(() => todosVideos.filter((v) => !v.archived), [todosVideos]);
   const clientMap = useClientMap();
   const today = todayISO();
 

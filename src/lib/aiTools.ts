@@ -7,6 +7,8 @@ import { markChargePaid, isOverdue, monthLabel } from './billing';
 import { todayISO } from './utils';
 import type { AiTool } from './ai';
 import type { PostStage, VideoStage, PostPlatform } from './types';
+import { normalizarNome } from './utils';
+import { onPostStageChange } from './automations';
 
 /**
  * Ferramentas que a IA Helper pode executar de verdade na plataforma.
@@ -26,16 +28,55 @@ function achar<T extends { id: string }>(lista: T[], id: string): T | undefined 
   return lista.find((x) => x.id === id);
 }
 
-/** Resolve um cliente por id OU por nome (aproximado) — a IA nem sempre sabe o id de cor. */
+/**
+ * Resolve um cliente por id OU por nome — a IA nem sempre sabe o id de cor.
+ * Nome aproximado só vale se apontar para UM cliente: antes, "Omni" pegava o
+ * primeiro Omni da lista, e uma mensagem ou exclusão ia para o cliente errado.
+ */
 function acharCliente(idOuNome: string) {
   const clients = useData.getState().clients;
   const porId = clients.find((c) => c.id === idOuNome);
   if (porId) return porId;
-  const alvo = idOuNome.trim().toLowerCase();
-  return (
-    clients.find((c) => c.name.toLowerCase() === alvo) ??
-    clients.find((c) => c.name.toLowerCase().includes(alvo))
-  );
+  const alvo = normalizarNome(idOuNome);
+  if (!alvo) return undefined;
+  const exatos = clients.filter((c) => normalizarNome(c.name) === alvo);
+  if (exatos.length === 1) return exatos[0];
+  if (exatos.length > 1) return undefined;
+  const parecidos = clients.filter((c) => normalizarNome(c.name).includes(alvo));
+  return parecidos.length === 1 ? parecidos[0] : undefined;
+}
+
+/**
+ * Texto da confirmação de uma ação sensível, com os clientes e itens JÁ
+ * resolvidos (o que vai acontecer de verdade), não o que a IA digitou.
+ */
+export function descreverAcao(nome: string, args: Record<string, unknown>): string {
+  const store = useData.getState();
+  if (nome === 'enviar_mensagem_whatsapp') {
+    const pedidos = (args.clientesIdsOuNomes as string[] | undefined) ?? [];
+    const achados = pedidos.map((n) => ({ n, c: acharCliente(n) }));
+    const vao = achados.filter((x) => x.c?.whatsappGroup).map((x) => x.c!.name);
+    const fora = achados.filter((x) => !x.c?.whatsappGroup).map((x) => (x.c ? `${x.c.name} (sem grupo)` : `"${x.n}" (não encontrado ou ambíguo)`));
+    return `Mandar no grupo de: ${vao.length ? vao.join(', ') : 'ninguém'}` +
+      (fora.length ? `\nFica de fora: ${fora.join(', ')}` : '') +
+      `\n\n"${String(args.mensagem ?? '')}"`;
+  }
+  if (nome === 'excluir_item') {
+    const id = String(args.id ?? '');
+    if (args.tipo === 'cliente') {
+      const c = acharCliente(id);
+      return c ? `Excluir o cliente "${c.name}". Posts, vídeos e lançamentos dele continuam, sem vínculo.` : `Cliente "${id}" não encontrado (ou o nome serve para mais de um). Nada será excluído.`;
+    }
+    if (args.tipo === 'post') {
+      const p = store.posts.find((x) => x.id === id);
+      return p ? `Excluir o post "${p.title}" definitivamente.` : 'Post não encontrado. Nada será excluído.';
+    }
+    if (args.tipo === 'video') {
+      const v = store.videos.find((x) => x.id === id);
+      return v ? `Excluir o vídeo "${v.title}" definitivamente.` : 'Vídeo não encontrado. Nada será excluído.';
+    }
+  }
+  return JSON.stringify(args);
 }
 
 const TOOLS: ToolDef[] = [
@@ -255,7 +296,11 @@ const TOOLS: ToolDef[] = [
       if (args.dataPrevista) patch.scheduledDate = args.dataPrevista;
       if (args.arquivar !== undefined) patch.archived = args.arquivar;
       if (Object.keys(patch).length) updatePost(post.id, patch);
-      if (args.etapa) movePost(post.id, args.etapa as PostStage, 0);
+      if (args.etapa && args.etapa !== post.stage) {
+        movePost(post.id, args.etapa as PostStage, 0);
+        // Mesmo efeito de arrastar na tela: chegar em Aprovação manda pro grupo.
+        onPostStageChange(post.id, post.stage, String(args.etapa));
+      }
       return { ok: true };
     },
   },

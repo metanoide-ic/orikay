@@ -249,7 +249,7 @@ export function PostModal({ postId, onClose }: { postId: string; onClose: () => 
         </div>
 
         <div className="flex items-center justify-between border-t border-line pt-4">
-          <Button variant="danger" onClick={() => { removePost(postId); onClose(); }}>
+          <Button variant="danger" onClick={() => { if (!confirm('Excluir este post? Não dá para desfazer.')) return; removePost(postId); onClose(); }}>
             <Trash2 size={16} /> Excluir post
           </Button>
           <Button onClick={onClose}>Concluído</Button>

@@ -3,22 +3,9 @@ import { useSettings } from './settingsStore';
 import { fireWebhook } from './automations';
 import type { Client } from './types';
 
-/** Só entram os agentes ativos: têm o prefixo "Omni " e o grupo cadastrado. */
-export function omniAtivos() {
-  return useData.getState().clients.filter((c) => c.name.startsWith('Omni ') && c.whatsappGroup);
-}
-
 /** Todo cliente com grupo de WhatsApp cadastrado — a audiência possível de um disparo em massa. */
 export function clientesComGrupo(): Client[] {
   return useData.getState().clients.filter((c) => c.whatsappGroup);
-}
-
-/**
- * Manda a mesma mensagem para o grupo de WhatsApp de cada agente Omni ativo.
- * Quem saiu (sem grupo cadastrado) fica de fora — não tem como adivinhar.
- */
-export async function sendOmniBroadcast(mensagem: string): Promise<{ enviados: number; falhas: number }> {
-  return sendBroadcast(mensagem, omniAtivos());
 }
 
 /**

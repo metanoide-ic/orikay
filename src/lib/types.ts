@@ -26,6 +26,16 @@ export interface Account {
 /** Cadência semanal: para cada dia da semana (0=Dom..6=Sáb), tipos de conteúdo. */
 export type WeeklyPlan = Record<number, string[]>;
 
+/** Mensagem que sai sozinha no grupo do cliente toda semana (via Conector). */
+export interface MensagemSemanal {
+  id: ID;
+  /** 0 = domingo ... 6 = sábado. */
+  dia: number;
+  /** Hora cheia, no horário de Brasília. */
+  hora: number;
+  mensagem: string;
+}
+
 export interface Client {
   id: ID;
   name: string;
@@ -48,6 +58,8 @@ export interface Client {
   weeklyPlan?: WeeklyPlan;
   /** ID/nome do grupo de WhatsApp deste cliente. */
   whatsappGroup?: string;
+  /** Mensagens automáticas semanais no grupo (ex.: pedir os valores da promoção). */
+  mensagensSemanais?: MensagemSemanal[];
   /** Perfil do Instagram do cliente (para publicação). */
   instagram?: string;
   /** WhatsApp pessoal do responsável pelo pagamento (cobrança). */
@@ -410,6 +422,8 @@ export interface Campaign {
   history?: CampaignDay[];
   /** Marca que o investimento já virou despesa no caixa. */
   postedToFinance?: boolean;
+  /** Quanto do investimento já foi lançado no caixa (para lançar só a diferença depois). */
+  spendLancado?: number;
   createdAt: number;
   /** Marca de tempo da última mudança — usado pra sincronizar entre os dispositivos da equipe via o Conector. */
   updatedAt?: number;

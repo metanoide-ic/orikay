@@ -1,7 +1,11 @@
-# Plataforma Origem
+# Orikay
 
-Plataforma interna da agência **Origem — Comunicação & Marketing**. Reúne, em um só
-lugar, três ferramentas do dia a dia da equipe:
+Plataforma para agências de marketing organizarem o que produzem para os
+clientes: pauta, produção, aprovação pelo WhatsApp do cliente, publicação,
+tráfego pago e cobrança. Cada agência tem o seu espaço, com a sua equipe.
+
+O site de apresentação fica em https://orikay.com.br e a plataforma em
+https://orikay.com.br/#/entrar.
 
 - **Quadros** — gestão de tarefas no estilo Trello (colunas + arrastar-e-soltar,
   etiquetas, prioridade, prazo, checklist e vínculo com cliente).
@@ -60,13 +64,11 @@ lugar, três ferramentas do dia a dia da equipe:
   (o Painel e os cards de clientes também ocultam valores para quem não tem acesso).
 
 Funciona como **site** e como **aplicativo** (PWA instalável no celular e no
-desktop). Interface moderna, com a identidade visual da Origem (violeta elétrico
-sobre preto) e criação de contas em segundos.
+desktop).
 
 ## Como rodar
 
 ```bash
-cd plataforma-origem
 npm install
 npm run dev        # ambiente de desenvolvimento (http://localhost:5173)
 ```
@@ -86,8 +88,8 @@ roteamento usa hash (`/#/`), funciona também em subpastas sem configuração ex
 
 ## Links oficiais
 
-- **Site (online):** https://metanoide-ic.github.io/orikay/
-  — atualizado automaticamente a cada push (workflow "Publicar Plataforma Origem").
+- **Site (online):** https://orikay.com.br
+  — atualizado automaticamente a cada push na `main` (workflow "Publicar Orikay").
 - **Instaladores do app desktop:** https://github.com/metanoide-ic/orikay/releases/tag/instaladores-v1
   — Windows (.exe), macOS (.dmg) e Linux (.AppImage), gerados pelo workflow
   "Instaladores do app desktop".
@@ -136,31 +138,34 @@ contas. Quem faz esse trabalho é o **Conector Orikay**, em `conector/`.
   inteligente, informe um endpoint compatível com OpenAI + chave (Groq/OpenRouter
   têm camada gratuita).
 
-## Contas da equipe e permissões
+## Nuvem: contas, agências e sincronização
 
-As contas oficiais são criadas automaticamente no primeiro acesso (login = nome):
-Daniel Designer, Jr Social Media, Angélica Leal, João Paulo e Luiz Paulo SM.
-As senhas de fábrica valem **apenas para o primeiro acesso**: a plataforma trava
-em uma tela de definição de senha e não abre nenhuma outra até a pessoa escolher
-a sua. Depois disso a senha antiga deixa de funcionar.
-O **Financeiro** é visível apenas para contas com permissão especial (por padrão,
-Angélica Leal e João Paulo). Um admin ajusta as permissões em
-**Integrações → Permissões**.
+Com o Supabase configurado (`VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no
+`.env`), a plataforma roda na nuvem:
 
-## Contas e dados
+- **Conta e agência:** quem chega cria a conta com e-mail e senha e já cria a
+  agência (vira administrador). A equipe entra por **link de convite** gerado
+  em Equipe, que vale para uma pessoa e expira em 14 dias.
+- **Isolamento:** cada agência só enxerga os próprios dados (RLS no banco).
+  Lançamentos e cobranças só aparecem para quem tem acesso ao Financeiro.
+- **Tempo real:** cada alteração sobe registro por registro e aparece nos
+  outros aparelhos na hora. Sem internet, a fila fica salva no aparelho e
+  sobe quando a conexão volta. Imagens anexadas vão para o armazenamento de
+  arquivos, não para o banco.
+- **Migração:** o primeiro administrador que entra num aparelho com dados de
+  antes da nuvem escolhe levar tudo para a agência ou começar do zero.
+- **Banco:** o esquema completo está em `supabase/migrations/`. Para aplicar:
+  `npx supabase db push` (com o projeto vinculado) ou colar o SQL no SQL
+  Editor do painel.
 
-- A criação de conta é local e imediata — basta nome e senha.
-- Os dados (quadros, posts, financeiro e clientes) são salvos **localmente no
-  navegador** do dispositivo (localStorage). Não há servidor: é uma aplicação
-  100% no cliente, pensada para uso rápido e privado da equipe.
-- Ao criar a primeira conta, a plataforma já vem com dados de exemplo para
-  ilustrar o uso. Em **Configurações** é possível recarregar o exemplo ou limpar
-  tudo para começar do zero.
+O Conector continua responsável por WhatsApp, Instagram, anúncios, gateway de
+cobrança e mensagens automáticas semanais; os dados da agência sincronizam pela
+nuvem.
 
-> Observação: por serem locais, os dados não são compartilhados automaticamente
-> entre dispositivos. Para uma versão com login em nuvem e dados compartilhados
-> entre a equipe, o próximo passo seria conectar um backend (ex.: Supabase ou
-> Firebase) — a estrutura de dados já está organizada em `src/lib` para isso.
+Sem as variáveis do Supabase, a plataforma roda no **modo local**: dados no
+navegador, sincronização entre aparelhos só pelo Conector, e a primeira conta
+criada no aparelho é a administradora.
+
 
 ## Stack
 

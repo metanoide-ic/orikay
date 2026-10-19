@@ -6,7 +6,7 @@ import { useData } from '@/lib/dataStore';
 import { useAuth } from '@/lib/authStore';
 import { generateVideoScript } from '@/lib/ai';
 import { VIDEO_STAGE_META, VIDEO_STAGE_ORDER } from '@/lib/labels';
-import { uid, cn } from '@/lib/utils';
+import { uid, cn, hrefSeguro } from '@/lib/utils';
 
 export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () => void }) {
   const video = useData((s) => s.videos.find((v) => v.id === videoId));
@@ -118,7 +118,7 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
               <div key={l.id} className="group flex items-center gap-2 rounded-lg border border-line bg-white/[0.02] px-3 py-2">
                 <Link2 size={14} className="text-brand-300" />
                 <span className="text-sm text-white/80">{l.label}</span>
-                <a href={l.url} target="_blank" rel="noreferrer" className="ml-auto text-brand-300 hover:text-brand-200"><ExternalLink size={14} /></a>
+                <a href={hrefSeguro(l.url)} target="_blank" rel="noreferrer" className="ml-auto text-brand-300 hover:text-brand-200"><ExternalLink size={14} /></a>
                 <button onClick={() => removeLink(videoId, l.id)} className="text-white/20 opacity-0 transition hover:text-red-300 group-hover:opacity-100"><X size={14} /></button>
               </div>
             ))}
@@ -158,7 +158,7 @@ export function VideoModal({ videoId, onClose }: { videoId: string; onClose: () 
         </div>
 
         <div className="flex items-center justify-between border-t border-line pt-4">
-          <Button variant="danger" onClick={() => { remove(videoId); onClose(); }}><Trash2 size={16} /> Excluir</Button>
+          <Button variant="danger" onClick={() => { if (!confirm('Excluir este vídeo? Não dá para desfazer.')) return; remove(videoId); onClose(); }}><Trash2 size={16} /> Excluir</Button>
           <Button onClick={onClose}>Concluído</Button>
         </div>
       </div>

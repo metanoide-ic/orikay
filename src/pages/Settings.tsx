@@ -6,6 +6,9 @@ import { Button, Field, Input, Avatar, Modal } from '@/components/ui';
 import { useAuth } from '@/lib/authStore';
 import { useData } from '@/lib/dataStore';
 import { AVATAR_COLORS, cn } from '@/lib/utils';
+import { NUVEM } from '@/lib/nuvem/cliente';
+import { atualizarPerfil, sair, trocarSenha } from '@/lib/nuvem/sessao';
+import { isoLocal } from '@/lib/utils';
 
 /** Chaves persistidas no navegador que compõem um backup completo. */
 const BACKUP_KEYS = ['origem.data', 'origem.auth', 'origem.settings'] as const;
@@ -14,7 +17,8 @@ export default function Settings() {
   const user = useAuth((s) => s.current());
   const updateProfile = useAuth((s) => s.updateProfile);
   const changePassword = useAuth((s) => s.changePassword);
-  const logout = useAuth((s) => s.logout);
+  const logoutLocal = useAuth((s) => s.logout);
+  const logout = () => { if (NUVEM) void sair(); else logoutLocal(); };
   const data = useData();
   const navigate = useNavigate();
   const importRef = useRef<HTMLInputElement>(null);
@@ -32,7 +36,8 @@ export default function Settings() {
   if (!user) return null;
 
   function save() {
-    updateProfile({ name: name.trim() || user!.name, role: role.trim(), color });
+    if (NUVEM) void atualizarPerfil({ nome: name.trim() || user!.name, cargo: role.trim(), cor: color });
+    else updateProfile({ name: name.trim() || user!.name, role: role.trim(), color });
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
   }
@@ -46,7 +51,7 @@ export default function Settings() {
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `origem-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `orikay-backup-${isoLocal()}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     setBackupMsg('Backup exportado. Guarde o arquivo em local seguro.');
@@ -101,7 +106,7 @@ export default function Settings() {
                 <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ex.: Diretor de arte" />
               </Field>
             </div>
-            <Field label="Login">
+            <Field label={NUVEM ? 'E-mail' : 'Login'}>
               <Input value={user.login} disabled className="mt-4 opacity-60" />
             </Field>
 
@@ -145,8 +150,10 @@ export default function Settings() {
                 {pwMsg.text}
               </p>
             )}
-            <Button className="mt-4" onClick={() => {
-              const res = changePassword(pwCurrent, pwNext);
+            <Button className="mt-4" onClick={async () => {
+              const res = NUVEM
+                ? await trocarSenha(pwCurrent, pwNext).then((r) => (r.ok ? { ok: true } : { ok: false, error: r.erro }))
+                : changePassword(pwCurrent, pwNext);
               setPwMsg(res.ok ? { ok: true, text: 'Senha alterada. Use a nova no próximo login.' } : { ok: false, text: res.error || 'Não foi possível alterar.' });
               if (res.ok) { setPwCurrent(''); setPwNext(''); }
               setTimeout(() => setPwMsg(null), 5000);
@@ -160,45 +167,23 @@ export default function Settings() {
               <h3 className="font-semibold">Dados da plataforma</h3>
             </div>
             <p className="text-sm text-white/50">
-              Os dados ficam salvos localmente neste navegador/dispositivo. Exporte um
-              backup regularmente para não perder nada — e use a importação para
-              restaurar ou levar os dados a outro computador.
+              {NUVEM
+                ? 'Os dados da agência ficam na nuvem e aparecem em qualquer aparelho da equipe. O backup baixa uma cópia do que está neste aparelho agora.'
+                : 'Os dados ficam salvos localmente neste navegador/dispositivo. Exporte um backup regularmente para não perder nada — e use a importação para restaurar ou levar os dados a outro computador.'}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button onClick={exportBackup}>
                 <Download size={16} /> Exportar backup
               </Button>
+              {!NUVEM && <>
               <Button variant="outline" onClick={() => importRef.current?.click()}>
                 <Upload size={16} /> Importar backup
               </Button>
               <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={importBackup} />
-              <Button variant="outline" onClick={() => {
-                const n = data.restoreClients();
-                setBackupMsg(n === 0
-                  ? 'A carteira já está completa: nenhum cliente faltando.'
-                  : `${n} cliente(s) da carteira reposto(s). Nada mais foi alterado.`);
-              }}>
-                Repor clientes da carteira
-              </Button>
-              <Button variant="outline" onClick={() => {
-                const n = data.restoreBillingFields();
-                setBackupMsg(n === 0
-                  ? 'Fee, vencimento e forma de pagamento já estavam preenchidos em todo mundo.'
-                  : `${n} cliente(s) tiveram fee, vencimento ou forma de pagamento repostos. O que já estava preenchido não foi tocado.`);
-              }}>
-                Repor fee e forma de pagamento
-              </Button>
-              <Button variant="outline" onClick={() => {
-                const n = data.restoreBriefings();
-                setBackupMsg(n === 0
-                  ? 'Todo mundo já está com o briefing mais atual (ou com um briefing que a equipe editou na tela, que não é mexido).'
-                  : `${n} briefing(s) atualizado(s) com a pesquisa mais recente sobre cada cliente. Briefing que a equipe já tinha editado na tela não foi tocado.`);
-              }}>
-                Atualizar briefings pesquisados
-              </Button>
               <Button variant="danger" onClick={() => setConfirmReset(true)}>
                 Limpar todos os dados
               </Button>
+              </>}
             </div>
             {backupMsg && (
               <p className="mt-3 rounded-lg border border-line bg-white/[0.02] px-3.5 py-2.5 text-sm text-white/70">{backupMsg}</p>
@@ -228,7 +213,7 @@ export default function Settings() {
           <section className="card p-6 text-sm text-white/50">
             <h3 className="mb-2 font-semibold text-white">Sobre</h3>
             <p>
-              Orikay, a plataforma da Origem: quadros, posts, vídeos e financeiro para a
+              Orikay: posts, vídeos, clientes e financeiro para a
               rotina da agência.
             </p>
             <p className="mt-3 text-xs text-white/35">Versão 1.0 · Web &amp; App (PWA)</p>

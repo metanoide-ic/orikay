@@ -92,7 +92,7 @@ export default function Library() {
                   <CopyIcon size={14} /> {copiedId === i.id ? 'Copiado' : 'Copiar'}
                 </Button>
                 {tab === 'modelos' && <Button size="sm" variant="ghost" onClick={() => openEdit(i)}><Pencil size={14} /></Button>}
-                <Button size="sm" variant="ghost" onClick={() => removeLibraryItem(i.id)}><Trash2 size={14} /></Button>
+                <Button size="sm" variant="ghost" onClick={() => { if (confirm('Apagar este modelo da biblioteca?')) removeLibraryItem(i.id); }}><Trash2 size={14} /></Button>
               </div>
             </div>
           ))}

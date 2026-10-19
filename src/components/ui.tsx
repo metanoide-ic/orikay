@@ -439,6 +439,7 @@ export function Avatar({
 }
 
 /* ---------------------------- Modal ----------------------------- */
+const pilhaDeModais: symbol[] = [];
 export function Modal({
   open,
   onClose,
@@ -456,12 +457,20 @@ export function Modal({
 }) {
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Pilha de modais abertos: Esc fecha só o de cima, e a rolagem da página
+    // só volta quando o último fecha (antes, fechar um modal empilhado
+    // destravava a página com o outro ainda aberto).
+    const eu = Symbol('modal');
+    pilhaDeModais.push(eu);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && pilhaDeModais[pilhaDeModais.length - 1] === eu) onClose();
+    };
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      pilhaDeModais.splice(pilhaDeModais.indexOf(eu), 1);
+      if (pilhaDeModais.length === 0) document.body.style.overflow = '';
     };
   }, [open, onClose]);
 
@@ -469,6 +478,8 @@ export function Modal({
     <AnimatePresence>
       {open && (
         <motion.div
+          role="dialog"
+          aria-modal="true"
           className="fixed inset-0 z-50 grid place-items-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

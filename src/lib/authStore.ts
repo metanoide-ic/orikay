@@ -4,21 +4,11 @@ import type { Account } from './types';
 import { hash, pickColor, uid } from './utils';
 
 /**
- * Contas oficiais da equipe Origem, criadas automaticamente.
- *
- * Só o hash das senhas fica no código, nunca o texto puro. Ainda assim,
- * essas senhas foram combinadas por fora e passaram pelo histórico do
- * projeto, então servem apenas para o primeiro acesso: a plataforma obriga
- * cada um a definir a sua antes de liberar qualquer tela.
+ * Contas do modo local (sem nuvem). Não existe conta de fábrica: o código
+ * vai inteiro para o navegador de quem abre o site, então nenhum login de
+ * agência pode morar aqui. A primeira pessoa cria a conta na tela de entrada.
  */
-const TEAM: Array<Omit<Account, 'id' | 'color' | 'createdAt'>> = [
-  { name: 'Daniel Designer', login: 'danieldesigner', role: 'Designer', canFinance: false, admin: false, passHash: '8ce0d6d9' },
-  { name: 'Jr Social Media', login: 'jrfilhodejr', role: 'Social Media', canFinance: false, admin: false, passHash: '5531f19' },
-  { name: 'Angélica Leal', login: 'angelicaleal', role: 'Direção', canFinance: true, admin: true, passHash: '582e7fc9' },
-  { name: 'João Paulo', login: 'joaopauloleal', role: 'Direção', canFinance: true, admin: true, passHash: '582e7fc9' },
-  { name: 'Luiz Paulo SM', login: 'luizpaulodacu', role: 'Social Media', canFinance: false, admin: false, passHash: '9cfd561a' },
-  { name: 'Leandro Filmmaker', login: 'leandrofilmmaker', role: 'Filmmaker', canFinance: false, admin: false, passHash: '1695bbde' },
-];
+const TEAM: Array<Omit<Account, 'id' | 'color' | 'createdAt'>> = [];
 
 function norm(s: string) {
   return s.trim().toLowerCase();
@@ -74,16 +64,19 @@ export const useAuth = create<AuthState>()(
         if (password.length < 4) return { ok: false, error: 'A senha precisa de ao menos 4 caracteres.' };
         if (get().accounts.some((a) => norm(a.login) === norm(loginId)))
           return { ok: false, error: 'Já existe uma conta com este login.' };
+        // A primeira conta do aparelho administra (senão ninguém conseguiria
+        // liberar o Financeiro nem adicionar a equipe).
+        const primeira = get().accounts.length === 0;
         const account: Account = {
           id: uid('user'),
           name: name.trim(),
           login: loginId,
           email: email?.trim() || undefined,
           passHash: hash(password),
-          role: role?.trim() || 'Membro da equipe',
+          role: role?.trim() || (primeira ? 'Direção' : 'Membro da equipe'),
           color: pickColor(loginId),
-          canFinance: false,
-          admin: false,
+          canFinance: primeira,
+          admin: primeira,
           createdAt: Date.now(),
         };
         set((s) => ({ accounts: [...s.accounts, account], currentId: account.id }));
@@ -142,6 +135,8 @@ export const useAuth = create<AuthState>()(
         const account: Account = {
           id: uid('user'), name: loginId, login: loginId,
           passHash: hash(password), role: role?.trim() || 'Membro da equipe',
+          // Senha escolhida pelo admin é provisória: a pessoa troca no 1º acesso.
+          mustChangePassword: true,
           color: pickColor(loginId), canFinance: !!canFinance, admin: !!admin, createdAt: Date.now(),
         };
         set((s) => ({ accounts: [...s.accounts, account] }));

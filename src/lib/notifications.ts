@@ -14,7 +14,7 @@ export function usePendingPosts(): Pending[] {
   return useMemo(() => {
     const today = todayISO();
     return posts
-      .filter((p) => p.stage !== 'publicado' && !p.published && p.scheduledDate && p.scheduledDate <= today)
+      .filter((p) => !p.archived && p.stage !== 'publicado' && !p.published && p.scheduledDate && p.scheduledDate <= today)
       .map((p) => ({ post: p, overdue: (p.scheduledDate as string) < today }))
       .sort((a, b) => (a.post.scheduledDate! < b.post.scheduledDate! ? -1 : 1));
   }, [posts]);

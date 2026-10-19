@@ -1,23 +1,7 @@
 import { useData } from './dataStore';
 import { currentMonthKey, monthLabel } from './billing';
-
-/**
- * Despesas fixas da agência: folha, casa e estrutura. Servem de modelo para
- * gerar o lançamento do mês — o valor pode ser ajustado depois (a conta de
- * luz, por exemplo, varia).
- */
-const DESPESAS_FIXAS: Array<{ description: string; amount: number; category: string; day: number }> = [
-  { description: 'AL7 - Daniel Designer', amount: 2100, category: 'Equipe', day: 5 },
-  { description: 'AL7 - João Paulo', amount: 3000, category: 'Equipe', day: 5 },
-  { description: 'AL7 - Júnior Gerenciador', amount: 2500, category: 'Equipe', day: 5 },
-  { description: 'Celular', amount: 250, category: 'Software', day: 5 },
-  { description: 'Internet', amount: 150, category: 'Software', day: 5 },
-  { description: 'Aluguel Casa', amount: 3000, category: 'Outros', day: 10 },
-  { description: 'Carro', amount: 1500, category: 'Outros', day: 10 },
-  { description: 'Contador - Carlos', amount: 400, category: 'Terceiros', day: 10 },
-  { description: 'Plano de Saúde', amount: 1000, category: 'Outros', day: 10 },
-  { description: 'Luz', amount: 600, category: 'Outros', day: 19 },
-];
+import { useSettings, type DespesaFixa } from './settingsStore';
+import { uid } from './utils';
 
 /**
  * Gera as despesas fixas do mês corrente, uma vez só (idempotente: quem já
@@ -26,16 +10,33 @@ const DESPESAS_FIXAS: Array<{ description: string; amount: number; category: str
  * pagamento, com o clique que alterna pago/pendente.
  */
 export function generateMonthlyExpenses(): number {
+  // Primeira vez: as despesas fixas eram uma lista no código; agora são da
+  // agência. Monta a lista com o que já se repetia mês a mês no Financeiro,
+  // para nenhum mês ficar sem lançar.
+  const ajustes = useSettings.getState();
+  if (!ajustes.despesasFixasIniciadas) {
+    ajustes.update({
+      despesasFixasIniciadas: true,
+      despesasFixas: ajustes.despesasFixas?.length ? ajustes.despesasFixas : inferirDespesasFixas(),
+    });
+  }
   const s = useData.getState();
   const month = currentMonthKey();
   let criadas = 0;
 
-  for (const d of DESPESAS_FIXAS) {
+  const ignorados = new Set(useSettings.getState().geracaoIgnorada ?? []);
+  // Cada agência cadastra as suas em Financeiro → Despesas fixas.
+  for (const d of useSettings.getState().despesasFixas ?? []) {
+    // Id fixo (despesa + mês): não duplica entre aparelhos e, se alguém
+    // apagar o lançamento do mês, ele não volta.
+    const id = `fixa_${d.id}_${month}`;
+    if (ignorados.has(id)) continue;
     const jaExiste = s.transactions.some(
-      (t) => t.type === 'despesa' && t.description === d.description && t.date.slice(0, 7) === month,
+      (t) => t.id === id || (t.type === 'despesa' && t.description === d.description && t.date.slice(0, 7) === month),
     );
     if (jaExiste) continue;
     s.addTx({
+      id,
       type: 'despesa',
       description: d.description,
       amount: d.amount,
@@ -55,4 +56,30 @@ export function generateMonthlyExpenses(): number {
     });
   }
   return criadas;
+}
+
+/**
+ * Sugere despesas fixas a partir do histórico: o que aparece como despesa,
+ * com a mesma descrição, em pelo menos dois meses diferentes. Valor e dia
+ * vêm do lançamento mais recente.
+ */
+export function inferirDespesasFixas(): DespesaFixa[] {
+  const porDescricao = new Map<string, { meses: Set<string>; ultimo: { amount: number; category: string; date: string } }>();
+  for (const t of useData.getState().transactions) {
+    if (t.type !== 'despesa' || !t.description?.trim()) continue;
+    const atual = porDescricao.get(t.description) ?? { meses: new Set<string>(), ultimo: t };
+    atual.meses.add(t.date.slice(0, 7));
+    if (t.date >= atual.ultimo.date) atual.ultimo = t;
+    porDescricao.set(t.description, atual);
+  }
+  return [...porDescricao.entries()]
+    .filter(([, v]) => v.meses.size >= 2)
+    .map(([description, v]) => ({
+      id: uid('fixa'),
+      description,
+      amount: v.ultimo.amount,
+      category: v.ultimo.category,
+      day: Math.min(28, Math.max(1, Number(v.ultimo.date.slice(8, 10)) || 5)),
+    }))
+    .sort((a, b) => a.day - b.day || a.description.localeCompare(b.description));
 }

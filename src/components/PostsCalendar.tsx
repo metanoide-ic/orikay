@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { STAGE_META } from '@/lib/labels';
-import { HOLIDAYS } from '@/lib/planner';
+import { holidaysOf } from '@/lib/planner';
 import { useClientMap } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import type { Post } from '@/lib/types';
+import { isoLocal } from '@/lib/utils';
 
 const WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -13,7 +14,7 @@ export function PostsCalendar({ posts, onOpen }: { posts: Post[]; onOpen: (id: s
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const clientMap = useClientMap();
-  const todayISO = now.toISOString().slice(0, 10);
+  const todayISO = isoLocal(now);
 
   const byDay = useMemo(() => {
     const map: Record<string, Post[]> = {};
@@ -31,7 +32,7 @@ export function PostsCalendar({ posts, onOpen }: { posts: Post[]; onOpen: (id: s
   while (cells.length % 7 !== 0) cells.push(null);
 
   const iso = (d: number) => `${ym.y}-${String(ym.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  const holidayFor = (d: number) => HOLIDAYS.find((h) => h.md === `${String(ym.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+  const holidayFor = (d: number) => holidaysOf(ym.y).find((h) => h.md === `${String(ym.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
 
   function shift(delta: number) {
     setYm(({ y, m }) => {

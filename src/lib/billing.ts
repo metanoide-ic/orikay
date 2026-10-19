@@ -1,8 +1,9 @@
 import { useData } from './dataStore';
 import { useSettings } from './settingsStore';
 import { fireWebhook } from './automations';
-import { uid, money, todayISO } from './utils';
+import { money, todayISO, isoLocal } from './utils';
 import type { BillingMethod, Charge } from './types';
+import { nomeDaAgencia } from './agencia';
 
 export const METHOD_LABEL: Record<BillingMethod, string> = {
   pix: 'Pix',
@@ -11,7 +12,7 @@ export const METHOD_LABEL: Record<BillingMethod, string> = {
 };
 
 export function currentMonthKey(): string {
-  return new Date().toISOString().slice(0, 7);
+  return isoLocal().slice(0, 7);
 }
 
 export function monthLabel(month: string): string {
@@ -31,12 +32,17 @@ export function generateMonthlyCharges(): number {
   const month = currentMonthKey();
   const created: Charge[] = [];
 
+  const ignorados = new Set(useSettings.getState().geracaoIgnorada ?? []);
   for (const c of s.clients) {
     if (!c.monthlyFee) continue;
-    if (s.charges.some((ch) => ch.clientId === c.id && ch.month === month)) continue;
+    // Id fixo (cliente + mês): dois aparelhos gerando ao mesmo tempo caem na
+    // mesma cobrança, em vez de duplicar e cobrar o cliente duas vezes.
+    const id = `chg_${c.id}_${month}`;
+    if (ignorados.has(id)) continue; // alguém apagou de propósito
+    if (s.charges.some((ch) => ch.id === id || (ch.clientId === c.id && ch.month === month))) continue;
     const day = Math.min(Math.max(c.billingDay ?? 5, 1), 28);
     created.push({
-      id: uid('chg'),
+      id,
       clientId: c.id,
       month,
       amount: c.monthlyFee,
@@ -63,7 +69,7 @@ export function generateMonthlyCharges(): number {
 function reminderMessage(ch: Charge): string {
   const venc = new Date(ch.dueDate + 'T00:00').toLocaleDateString('pt-BR');
   return (
-    `Olá! Aqui é a equipe da Origem, tudo bem?\n\n` +
+    `Olá! Aqui é a equipe da ${nomeDaAgencia()}, tudo bem?\n\n` +
     `Passando só para lembrar da cobrança de ${monthLabel(ch.month)} (venc. ${venc}), ` +
     `no valor de ${money(ch.amount)}. Consegue confirmar se o pagamento já foi feito?\n\n` +
     `Se já tiver pago, pode desconsiderar — muito obrigado! Qualquer dúvida é só responder por aqui.`
@@ -74,7 +80,7 @@ function chargeMessage(ch: Charge, pixKey: string, reenvio: boolean): string {
   if (reenvio) return reminderMessage(ch);
   const venc = new Date(ch.dueDate + 'T00:00').toLocaleDateString('pt-BR');
   const base =
-    `Olá! Aqui é a equipe da Origem.\n\n` +
+    `Olá! Aqui é a equipe da ${nomeDaAgencia()}.\n\n` +
     `Segue a cobrança de ${monthLabel(ch.month)} referente aos nossos serviços:\n` +
     `Valor: ${money(ch.amount)}\n` +
     `Vencimento: ${venc}\n`;
@@ -201,7 +207,7 @@ export async function sendCharge(chargeId: string): Promise<ResultadoCobranca> {
       competencia: ch.month,
       mensagem:
         `Olá! Pode emitir a nota fiscal de ${monthLabel(ch.month)} para ${client.name}, ` +
-        `no valor de ${money(ch.amount)}? Referente aos serviços de marketing da Origem. Obrigado!`,
+        `no valor de ${money(ch.amount)}? Referente aos serviços de marketing da ${nomeDaAgencia()}. Obrigado!`,
     };
     // O Conector também entende o pedido de nota fiscal (tipo 'nota_fiscal').
     const canalNf = settings.whatsappWebhook || settings.connectorUrl;
